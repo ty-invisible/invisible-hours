@@ -1,0 +1,123 @@
+import { useState, useCallback, useRef } from 'react'
+import { useCategoryStore } from '../../store/categoryStore'
+import { CategoryRow } from '../palette/CategoryRow'
+import { MoreAccordion } from '../palette/MoreAccordion'
+import { EraserButton } from '../palette/EraserButton'
+import { CategoryEditor } from '../palette/CategoryEditor'
+import { PlusIcon } from '../ui/Icons'
+
+const MAX_VISIBLE = 10
+
+interface PaletteColumnProps {
+  sync: {
+    saveCategories: () => Promise<void>
+    deleteAllEntriesForCategory: (catId: string) => Promise<void>
+  }
+}
+
+export function PaletteColumn({ sync }: PaletteColumnProps) {
+  const categories = useCategoryStore((s) => s.categories)
+  const activeCategoryId = useCategoryStore((s) => s.activeCategoryId)
+  const reorder = useCategoryStore((s) => s.reorder)
+
+  const dragFrom = useRef<number | null>(null)
+  const [showNewEditor, setShowNewEditor] = useState(false)
+  const [newEditorPos, setNewEditorPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+
+  const hotkey = (i: number) => {
+    if (i < 9) return String(i + 1)
+    if (i === 9) return '0'
+    return null
+  }
+
+  const visibleCats = categories.slice(0, MAX_VISIBLE)
+  const overflowCats = categories.slice(MAX_VISIBLE)
+
+  const onDragStart = useCallback((index: number) => {
+    dragFrom.current = index
+  }, [])
+
+  const onDragEnter = useCallback((index: number) => {
+    if (dragFrom.current === null || dragFrom.current === index) return
+    reorder(dragFrom.current, index)
+    dragFrom.current = index
+  }, [reorder])
+
+  const onDragEnd = useCallback(() => {
+    dragFrom.current = null
+    sync.saveCategories()
+  }, [sync])
+
+  const handleAddClick = (e: React.MouseEvent) => {
+    setNewEditorPos({ x: e.clientX, y: e.clientY })
+    setShowNewEditor(true)
+  }
+
+  return (
+    <div className="h-full flex flex-col bg-surface px-4 py-3">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-visible">
+        <div className="flex flex-col gap-0.5 pt-0.5">
+          {visibleCats.map((cat, i) => (
+            <CategoryRow
+              key={cat.catId}
+              catId={cat.catId}
+              label={cat.label}
+              color={cat.color}
+              hotkey={hotkey(i)}
+              isActive={activeCategoryId === cat.catId}
+              index={i}
+              onDragStart={onDragStart}
+              onDragEnter={onDragEnter}
+              onDragEnd={onDragEnd}
+              onSaveCategories={sync.saveCategories}
+              onDeleteAllEntries={sync.deleteAllEntriesForCategory}
+            />
+          ))}
+        </div>
+
+        {overflowCats.length > 0 && (
+          <MoreAccordion count={overflowCats.length}>
+            <div className="flex flex-col gap-0.5">
+              {overflowCats.map((cat, i) => (
+                <CategoryRow
+                  key={cat.catId}
+                  catId={cat.catId}
+                  label={cat.label}
+                  color={cat.color}
+                  hotkey={null}
+                  isActive={activeCategoryId === cat.catId}
+                  index={MAX_VISIBLE + i}
+                  onDragStart={onDragStart}
+                  onDragEnter={onDragEnter}
+                  onDragEnd={onDragEnd}
+                  onSaveCategories={sync.saveCategories}
+                  onDeleteAllEntries={sync.deleteAllEntriesForCategory}
+                />
+              ))}
+            </div>
+          </MoreAccordion>
+        )}
+      </div>
+
+      <div className="mt-2 flex flex-col gap-1 flex-shrink-0">
+        <EraserButton />
+        <button
+          onClick={handleAddClick}
+          className="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-sm text-muted hover:text-text hover:bg-bg transition-colors"
+        >
+          <PlusIcon size={18} />
+          Add Category
+        </button>
+      </div>
+
+      {showNewEditor && (
+        <CategoryEditor
+          position={newEditorPos}
+          onClose={() => setShowNewEditor(false)}
+          onSave={sync.saveCategories}
+          onDeleteAllEntries={sync.deleteAllEntriesForCategory}
+        />
+      )}
+    </div>
+  )
+}

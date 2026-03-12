@@ -1,0 +1,152 @@
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { motion, AnimatePresence } from 'motion/react'
+import { SLOTS, dateKey, getWeekDates } from '../../lib/slots'
+import { useCalendarStore } from '../../store/calendarStore'
+import { SlotCell } from './SlotCell'
+import { NotePopup } from './NotePopup'
+import { useDragPaint } from '../../hooks/useDragPaint'
+import type { SlotEntry } from '../../store/calendarStore'
+
+const WEEK_SLOT_HEIGHT = 44
+const SCROLL_TO_INDEX = 16 // 08:00
+const DAY_ABBREVS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+function formatHourLabel(slotKey: string): string {
+  const hour = parseInt(slotKey.split(':')[0], 10)
+  if (hour === 0) return '12 AM'
+  if (hour < 12) return `${hour} AM`
+  if (hour === 12) return '12 PM'
+  return `${hour - 12} PM`
+}
+
+interface WeekGridProps {
+  onStrokeComplete: (dk: string, changes: Record<string, SlotEntry | null>) => void
+  onSaveNote: (dk: string, slotKey: string, note: string) => void
+}
+
+export function WeekGrid({ onStrokeComplete, onSaveNote }: WeekGridProps) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const currentDate = useCalendarStore((s) => s.currentDate)
+  const slotData = useCalendarStore((s) => s.slotData)
+  const setFocusedSlot = useCalendarStore((s) => s.setFocusedSlot)
+
+  const weekDates = getWeekDates(currentDate)
+  const todayDk = dateKey(new Date())
+
+  const { onSlotMouseDown, onSlotMouseEnter, onMouseUp } = useDragPaint(onStrokeComplete)
+
+  const [notePopup, setNotePopup] = useState<{
+    dk: string; slotKey: string; position: { x: number; y: number }
+  } | null>(null)
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    requestAnimationFrame(() => {
+      el.scrollTop = SCROLL_TO_INDEX * WEEK_SLOT_HEIGHT
+    })
+  }, [])
+
+  useEffect(() => {
+    window.addEventListener('mouseup', onMouseUp)
+    return () => window.removeEventListener('mouseup', onMouseUp)
+  }, [onMouseUp])
+
+  const handleContextMenu = useCallback((_e: React.MouseEvent, dk: string, slotKey: string) => {
+    setFocusedSlot({ dateKey: dk, slotKey })
+  }, [setFocusedSlot])
+
+  const handleNoteClick = useCallback((e: React.MouseEvent, dk: string, slotKey: string) => {
+    setNotePopup({ dk, slotKey, position: { x: e.clientX, y: e.clientY } })
+  }, [])
+
+  return (
+    <div className="h-full flex flex-col">
+      {/* Day headers — offset left to account for hour label gutter */}
+      <div className="flex border-b border-border flex-shrink-0">
+        <div className="w-12 flex-shrink-0" />
+        {weekDates.map((d, i) => {
+          const dk = dateKey(d)
+          const isToday = dk === todayDk
+          return (
+            <motion.div
+              key={dk}
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.04 }}
+              className={`flex-1 text-center py-2 text-xs font-medium ${
+                isToday ? 'text-accent bg-accent/5' : 'text-muted'
+              }`}
+            >
+              {DAY_ABBREVS[i]} {d.getDate()}
+            </motion.div>
+          )
+        })}
+      </div>
+
+      {/* Slot grid */}
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto"
+        onMouseLeave={onMouseUp}
+      >
+        <div className="flex pt-3">
+          {/* Hour labels gutter */}
+          <div className="w-12 flex-shrink-0 relative" style={{ height: SLOTS.length * WEEK_SLOT_HEIGHT }}>
+            {SLOTS.map((slot) => {
+              if (!slot.key.endsWith(':00')) return null
+              return (
+                <div
+                  key={slot.key}
+                  className="absolute right-1.5 text-[10px] text-muted select-none leading-none"
+                  style={{ top: Math.max(0, slot.index * WEEK_SLOT_HEIGHT - 5) }}
+                >
+                  {formatHourLabel(slot.key)}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* 7-day columns */}
+          <div className="flex-1 flex">
+            {weekDates.map((d) => {
+              const dk = dateKey(d)
+              const daySlots = slotData[dk] || {}
+              return (
+                <div key={dk} className={`flex-1 ${dk === todayDk ? 'bg-accent/[0.03]' : ''}`}>
+                  {SLOTS.map((slot) => (
+                    <SlotCell
+                      key={slot.key}
+                      dk={dk}
+                      slotKey={slot.key}
+                      slotLabel={slot.label}
+                      entry={daySlots[slot.key]}
+                      isWeekView
+                      onMouseDown={onSlotMouseDown}
+                      onMouseEnter={onSlotMouseEnter}
+                      onContextMenu={handleContextMenu}
+                      onNoteClick={handleNoteClick}
+                    />
+                  ))}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {notePopup && (
+          <NotePopup
+            key={`${notePopup.dk}-${notePopup.slotKey}`}
+            dk={notePopup.dk}
+            slotKey={notePopup.slotKey}
+            position={notePopup.position}
+            onClose={() => setNotePopup(null)}
+            onSaveNote={onSaveNote}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
