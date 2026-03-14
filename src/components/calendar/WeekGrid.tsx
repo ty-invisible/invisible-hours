@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { SLOTS, dateKey, getWeekDates } from '../../lib/slots'
 import { useCalendarStore } from '../../store/calendarStore'
+import { useUIStore } from '../../store/uiStore'
 import { SlotCell } from './SlotCell'
 import { NotePopup } from './NotePopup'
 import { useDragPaint } from '../../hooks/useDragPaint'
@@ -30,7 +31,13 @@ export function WeekGrid({ onStrokeComplete, onSaveNote }: WeekGridProps) {
   const slotData = useCalendarStore((s) => s.slotData)
   const setFocusedSlot = useCalendarStore((s) => s.setFocusedSlot)
 
-  const weekDates = getWeekDates(currentDate)
+  const showWeekends = useUIStore((s) => s.showWeekends)
+
+  const allWeekDates = getWeekDates(currentDate)
+  const visibleDays = useMemo(() => {
+    const days = allWeekDates.map((d, i) => ({ date: d, abbrev: DAY_ABBREVS[i] }))
+    return showWeekends ? days : days.slice(0, 5)
+  }, [allWeekDates, showWeekends])
   const todayDk = dateKey(new Date())
 
   const { onSlotMouseDown, onSlotMouseEnter, onMouseUp } = useDragPaint(onStrokeComplete)
@@ -65,8 +72,8 @@ export function WeekGrid({ onStrokeComplete, onSaveNote }: WeekGridProps) {
       {/* Day headers — offset left to account for hour label gutter */}
       <div className="flex border-b border-border flex-shrink-0">
         <div className="w-12 flex-shrink-0" />
-        {weekDates.map((d, i) => {
-          const dk = dateKey(d)
+        {visibleDays.map(({ date, abbrev }, i) => {
+          const dk = dateKey(date)
           const isToday = dk === todayDk
           return (
             <motion.div
@@ -78,7 +85,7 @@ export function WeekGrid({ onStrokeComplete, onSaveNote }: WeekGridProps) {
                 isToday ? 'text-accent bg-accent/5' : 'text-muted'
               }`}
             >
-              {DAY_ABBREVS[i]} {d.getDate()}
+              {abbrev} {date.getDate()}
             </motion.div>
           )
         })}
@@ -107,10 +114,10 @@ export function WeekGrid({ onStrokeComplete, onSaveNote }: WeekGridProps) {
             })}
           </div>
 
-          {/* 7-day columns */}
+          {/* Day columns */}
           <div className="flex-1 flex">
-            {weekDates.map((d) => {
-              const dk = dateKey(d)
+            {visibleDays.map(({ date }) => {
+              const dk = dateKey(date)
               const daySlots = slotData[dk] || {}
               return (
                 <div key={dk} className={`flex-1 ${dk === todayDk ? 'bg-accent/[0.03]' : ''}`}>

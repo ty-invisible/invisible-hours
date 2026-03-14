@@ -99,14 +99,14 @@ export function PaletteColumn({ sync }: PaletteColumnProps) {
         )}
       </div>
 
-      <div className="mt-2 flex flex-col gap-1 flex-shrink-0">
+      <div className="mt-2 flex gap-1.5 flex-shrink-0">
         <EraserButton />
         <button
           onClick={handleAddClick}
-          className="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-sm text-muted hover:text-text hover:bg-bg transition-colors"
+          className="flex-1 h-14 flex flex-col items-center justify-center gap-1 rounded-lg text-xs bg-bg text-muted hover:text-text transition-colors"
         >
           <PlusIcon size={18} />
-          Add Category
+          Add
         </button>
       </div>
 

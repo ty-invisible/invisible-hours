@@ -7,8 +7,8 @@ interface StatsTabsProps {
 
 const TABS: { label: string; value: StatsMode }[] = [
   { label: 'Total', value: 'total' },
-  { label: '9–5', value: '9-5' },
-  { label: 'Overtime', value: 'overtime' },
+  { label: 'Work Day', value: '9-5' },
+  { label: 'OT', value: 'overtime' },
 ]
 
 export function StatsTabs({ active, onChange }: StatsTabsProps) {
@@ -20,7 +20,7 @@ export function StatsTabs({ active, onChange }: StatsTabsProps) {
           onClick={() => onChange(tab.value)}
           className={`flex-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
             active === tab.value
-              ? 'bg-surface text-text shadow-sm'
+              ? 'bg-surface text-text shadow-sm ring-1 ring-border'
               : 'text-muted hover:text-text'
           }`}
         >

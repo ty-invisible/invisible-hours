@@ -38,7 +38,13 @@ export function CategoryEditor({ catId, position, onClose, onSave, onDeleteAllEn
   const handleSave = () => {
     if (!name.trim()) return
     if (isNew) {
-      const newCatId = name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+      const baseId = name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') || 'category'
+      let newCatId = baseId
+      let n = 2
+      while (categories.some((c) => c.catId === newCatId)) {
+        newCatId = `${baseId}-${n}`
+        n += 1
+      }
       const maxOrder = Math.max(0, ...categories.map((c) => c.sortOrder))
       addCategory({
         catId: newCatId,

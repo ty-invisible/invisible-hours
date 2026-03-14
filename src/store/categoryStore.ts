@@ -100,19 +100,14 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
 
   deleteCategory: (catId) =>
     set((state) => {
-      const isBuiltin = DEFAULT_CAT_IDS.has(catId)
-      let newUserCats = [...state.userCategories]
+      const newUserCats = [...state.userCategories]
+      const existingIdx = newUserCats.findIndex((c) => c.catId === catId)
 
-      if (isBuiltin) {
-        const existingIdx = newUserCats.findIndex((c) => c.catId === catId)
-        if (existingIdx >= 0) {
-          newUserCats[existingIdx] = { ...newUserCats[existingIdx], isDeleted: true }
-        } else {
-          const def = DEFAULT_CATEGORIES.find((c) => c.catId === catId)!
-          newUserCats.push({ ...def, isDefault: true, isDeleted: true })
-        }
-      } else {
-        newUserCats = newUserCats.filter((c) => c.catId !== catId)
+      if (existingIdx >= 0) {
+        newUserCats[existingIdx] = { ...newUserCats[existingIdx], isDeleted: true }
+      } else if (DEFAULT_CAT_IDS.has(catId)) {
+        const def = DEFAULT_CATEGORIES.find((c) => c.catId === catId)!
+        newUserCats.push({ ...def, isDefault: true, isDeleted: true })
       }
 
       return {

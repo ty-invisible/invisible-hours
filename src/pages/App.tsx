@@ -11,22 +11,50 @@ import { ToastContainer } from '../components/ui/Toast'
 import { useUIStore } from '../store/uiStore'
 import { useSupabaseSync } from '../hooks/useSupabaseSync'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
+import { useThemeSync } from '../hooks/useThemeSync'
 
 export default function App() {
+  useThemeSync()
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user)
-      setLoading(false)
-    })
+    let cancelled = false
+    const authTimeout = window.setTimeout(() => {
+      if (!cancelled) {
+        setLoading(false)
+      }
+    }, 8000)
+
+    supabase.auth.getUser()
+      .then(({ data }) => {
+        if (!cancelled) {
+          setUser(data.user)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setUser(null)
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          window.clearTimeout(authTimeout)
+          setLoading(false)
+        }
+      })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
+      if (!cancelled) {
+        setUser(session?.user ?? null)
+      }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      cancelled = true
+      window.clearTimeout(authTimeout)
+      subscription.unsubscribe()
+    }
   }, [])
 
   if (loading) {
@@ -78,7 +106,7 @@ function AuthenticatedApp({ user }: { user: User }) {
           direction="left"
         />
         <div style={{ width: statsWidth }} className="flex-shrink-0 overflow-hidden">
-          <StatsColumn />
+          <StatsColumn sync={sync} />
         </div>
       </div>
       <ToastContainer />

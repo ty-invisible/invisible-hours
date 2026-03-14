@@ -70,12 +70,32 @@ export function useSupabaseSync(user: User | null) {
     }
   }, [loadEntriesForDates])
 
+  // Optional Supabase table for cross-device sync: create table user_settings (user_id uuid primary key, work_day_start smallint default 18, work_day_end smallint default 35);
+  const loadUserSettings = useCallback(async () => {
+    if (!user) return
+    try {
+      const { data } = await supabase
+        .from('user_settings')
+        .select('work_day_start, work_day_end')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (data?.work_day_start != null && data?.work_day_end != null) {
+        const s = Math.max(0, Math.min(47, Number(data.work_day_start)))
+        const e = Math.max(0, Math.min(47, Number(data.work_day_end)))
+        useUIStore.getState().setWorkDayRange(s, e)
+      }
+    } catch {
+      // user_settings table may not exist; keep localStorage defaults
+    }
+  }, [user])
+
   // Initial load
   useEffect(() => {
     if (!user) return
     loadCategories()
     loadCurrentView()
-  }, [user, loadCategories, loadCurrentView])
+    loadUserSettings()
+  }, [user, loadCategories, loadCurrentView, loadUserSettings])
 
   // Reload when date/view changes
   useEffect(() => {
@@ -199,5 +219,26 @@ export function useSupabaseSync(user: User | null) {
     saveTimer.current = setTimeout(() => setSaveStatus('idle'), 2000)
   }, [user, setSaveStatus, loadCurrentView])
 
-  return { saveEntries, saveNote, saveCategories, deleteAllEntriesForCategory, bulkImportEntries, loadCurrentView }
+  const saveWorkDayRange = useCallback(async () => {
+    if (!user) return
+    try {
+      const { workDayStartIndex, workDayEndIndex } = useUIStore.getState()
+      await supabase.from('user_settings').upsert(
+        { user_id: user.id, work_day_start: workDayStartIndex, work_day_end: workDayEndIndex },
+        { onConflict: 'user_id' }
+      )
+    } catch {
+      // user_settings table may not exist; localStorage already updated by setWorkDayRange
+    }
+  }, [user])
+
+  return {
+    saveEntries,
+    saveNote,
+    saveCategories,
+    deleteAllEntriesForCategory,
+    bulkImportEntries,
+    loadCurrentView,
+    saveWorkDayRange,
+  }
 }

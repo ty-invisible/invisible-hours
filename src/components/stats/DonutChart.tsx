@@ -27,12 +27,33 @@ function formatHours(mins: number): string {
 }
 
 export function DonutChart({ segments, totalMinutes }: DonutChartProps) {
-  if (segments.length === 0) {
+  const isEmpty = segments.length === 0 || totalMinutes === 0
+  if (isEmpty) {
     return (
-      <div className="flex items-center justify-center" style={{ width: SIZE, height: SIZE }}>
-        <div className="text-center">
-          <div className="text-2xl font-semibold text-muted">0m</div>
-          <div className="text-[10px] text-muted uppercase tracking-wider">Tracked</div>
+      <div className="relative" style={{ width: SIZE, height: SIZE }}>
+        <svg
+          width={SIZE}
+          height={SIZE}
+          className="block"
+          style={{ position: 'absolute', left: 0, top: 0 }}
+        >
+          <circle
+            cx={CENTER}
+            cy={CENTER}
+            r={RADIUS}
+            fill="none"
+            stroke="var(--color-border)"
+            strokeWidth={STROKE}
+          />
+        </svg>
+        <div
+          className="absolute inset-0 flex items-center justify-center text-center"
+          style={{ pointerEvents: 'none' }}
+        >
+          <div>
+            <div className="text-2xl font-semibold text-muted">0m</div>
+            <div className="text-[10px] text-muted uppercase tracking-wider">Tracked</div>
+          </div>
         </div>
       </div>
     )
@@ -69,9 +90,8 @@ export function DonutChart({ segments, totalMinutes }: DonutChartProps) {
             transition={{ duration: 0.6, ease: 'easeOut' }}
           />
         ) : (
-          segments.map((seg) => {
+          segments.map((seg, i) => {
             const dash = seg.fraction * CIRCUMFERENCE
-            const gap = CIRCUMFERENCE - dash
             const rotation = -90 + offset * 360
 
             offset += seg.fraction
@@ -85,12 +105,12 @@ export function DonutChart({ segments, totalMinutes }: DonutChartProps) {
                 fill="none"
                 stroke={seg.color}
                 strokeWidth={STROKE}
-                strokeDasharray={`${dash} ${gap}`}
+                strokeDasharray={`${dash} ${CIRCUMFERENCE}`}
                 strokeLinecap="butt"
                 transform={`rotate(${rotation} ${CENTER} ${CENTER})`}
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ duration: 0.6, ease: 'easeOut' }}
+                initial={{ strokeDashoffset: dash }}
+                animate={{ strokeDashoffset: 0 }}
+                transition={{ duration: 0.5, ease: 'easeOut', delay: i * 0.06 }}
               />
             )
           })

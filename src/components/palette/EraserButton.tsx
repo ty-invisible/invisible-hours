@@ -8,10 +8,10 @@ export function EraserButton() {
   return (
     <button
       onClick={toggleEraser}
-      className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg text-sm transition-colors ${
+      className={`flex-1 h-14 flex flex-col items-center justify-center gap-1 rounded-lg text-xs transition-colors ${
         eraserOn
           ? 'bg-error/10 text-error ring-2 ring-error/40'
-          : 'text-muted hover:text-text hover:bg-bg'
+          : 'bg-bg text-muted hover:text-text'
       }`}
     >
       <EraserIcon size={18} />

@@ -15,9 +15,15 @@ export const SLOT_INDEX: Record<string, number> = Object.fromEntries(
   SLOTS.map((s) => [s.key, s.index])
 )
 
-export const WORKDAY_START = 18 // 09:00
-export const WORKDAY_END = 35   // 17:00 (inclusive)
-export const WORKDAY_KEYS = new Set(SLOTS.slice(WORKDAY_START, WORKDAY_END + 1).map((s) => s.key))
+export const WORKDAY_START_DEFAULT = 18 // 09:00
+export const WORKDAY_END_DEFAULT = 35   // 17:00 (inclusive)
+
+/** Returns the set of slot keys between startIndex and endIndex (inclusive). */
+export function getWorkDayKeys(startIndex: number, endIndex: number): Set<string> {
+  const lo = Math.max(0, Math.min(startIndex, endIndex))
+  const hi = Math.min(47, Math.max(startIndex, endIndex))
+  return new Set(SLOTS.slice(lo, hi + 1).map((s) => s.key))
+}
 
 export const dateKey = (d: Date): string =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
