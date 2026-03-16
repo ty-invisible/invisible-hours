@@ -7,6 +7,7 @@ import { SlotCell } from './SlotCell'
 import { NotePopup } from './NotePopup'
 import { useDragPaint } from '../../hooks/useDragPaint'
 import type { SlotEntry } from '../../store/calendarStore'
+import { computeSlotGroupPositions } from '../../lib/slotGroups'
 
 const WEEK_SLOT_HEIGHT = 44
 const SCROLL_TO_INDEX = 16 // 08:00
@@ -130,6 +131,7 @@ export function WeekGrid({ onStrokeComplete, onSaveNote }: WeekGridProps) {
             {visibleDays.map(({ date }) => {
               const dk = dateKey(date)
               const daySlots = slotData[dk] || {}
+              const groupPositions = computeSlotGroupPositions(daySlots)
               return (
                 <div key={dk} className={`flex-1 ${dk === todayDk ? 'bg-accent/[0.03]' : ''}`}>
                   {SLOTS.map((slot) => (
@@ -141,6 +143,7 @@ export function WeekGrid({ onStrokeComplete, onSaveNote }: WeekGridProps) {
                       entry={daySlots[slot.key]}
                       isWeekView
                       isDragging={isDragging}
+                      groupPosition={groupPositions[slot.key]}
                       onMouseDown={onSlotMouseDown}
                       onMouseEnter={onSlotMouseEnter}
                       onTouchStart={onSlotTouchStart}

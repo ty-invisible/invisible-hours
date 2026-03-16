@@ -9,6 +9,8 @@ const PLUS_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/200
 
 const SWAP_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Cline x1='4' y1='7' x2='16' y2='7' stroke='white' stroke-width='4' stroke-linecap='round'/%3E%3Cpolyline points='12,4 16,7 12,10' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cline x1='16' y1='13' x2='4' y2='13' stroke='white' stroke-width='4' stroke-linecap='round'/%3E%3Cpolyline points='8,10 4,13 8,16' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cline x1='4' y1='7' x2='16' y2='7' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3Cpolyline points='12,4 16,7 12,10' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cline x1='16' y1='13' x2='4' y2='13' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3Cpolyline points='8,10 4,13 8,16' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 10 10, pointer`
 
+export type SlotGroupPosition = 'solo' | 'first' | 'middle' | 'last'
+
 interface SlotCellProps {
   dk: string
   slotKey: string
@@ -16,6 +18,7 @@ interface SlotCellProps {
   entry: SlotEntry | undefined
   isWeekView?: boolean
   isDragging?: boolean
+  groupPosition?: SlotGroupPosition
   onMouseDown: (dk: string, slotKey: string, e: React.MouseEvent) => void
   onMouseEnter: (dk: string, slotKey: string) => void
   onTouchStart?: (dk: string, slotKey: string, x: number, y: number) => void
@@ -23,8 +26,15 @@ interface SlotCellProps {
   onNoteClick: (e: React.MouseEvent, dk: string, slotKey: string) => void
 }
 
+const GROUP_RADIUS: Record<SlotGroupPosition, string> = {
+  solo: 'rounded-lg',
+  first: 'rounded-t-lg',
+  middle: '',
+  last: 'rounded-b-lg',
+}
+
 export const SlotCell = memo(function SlotCell({
-  dk, slotKey, entry, isWeekView, isDragging,
+  dk, slotKey, entry, isWeekView, isDragging, groupPosition,
   onMouseDown, onMouseEnter, onTouchStart, onContextMenu, onNoteClick,
 }: SlotCellProps) {
   const activeCategoryId = useCategoryStore((s) => s.activeCategoryId)
@@ -51,6 +61,7 @@ export const SlotCell = memo(function SlotCell({
   const showPlus = !isDragging && !isFilled && !!activeCategoryId && !eraserOn
 
   const showIdleHover = !isDragging && isFilled && !activeCategoryId && !eraserOn
+  const roundedClass = groupPosition ? GROUP_RADIUS[groupPosition] : ''
 
   const idleGradient = useMemo(() => {
     if (!showIdleHover || !color) return undefined
@@ -109,14 +120,16 @@ export const SlotCell = memo(function SlotCell({
       <div className="flex-1 h-full relative overflow-hidden">
         {isFilled ? (
           <div
-            className={`absolute inset-0 flex items-center px-2 transition-[filter,opacity] duration-150 ${
+            className={`absolute inset-0 flex items-center px-2 transition-[filter,opacity] duration-150 ${roundedClass} ${
               showCross ? 'group-hover:opacity-60 group-hover:saturate-50' : ''
             }`}
             style={{ backgroundColor: color, color: textColor }}
           >
-            <span className={`${isWeekView ? 'text-[10px]' : 'text-xs'} font-medium truncate relative z-10`}>
-              {label}
-            </span>
+            {(!groupPosition || groupPosition === 'solo' || groupPosition === 'first') && (
+              <span className={`${isWeekView ? 'text-[10px]' : 'text-xs'} font-medium truncate relative z-10`}>
+                {label}
+              </span>
+            )}
             {hasNote && (
               <button
                 onClick={(e) => { e.stopPropagation(); onNoteClick(e, dk, slotKey) }}
@@ -143,12 +156,12 @@ export const SlotCell = memo(function SlotCell({
           </div>
         ) : showPreview ? (
           <div
-            className="absolute inset-0 opacity-0 group-hover:opacity-[0.31] transition-opacity"
+            className="absolute inset-0 opacity-0 group-hover:opacity-[0.31] transition-opacity rounded-lg"
             style={{ backgroundColor: previewColor }}
           />
         ) : (
           <div
-            className="absolute inset-0 opacity-0 group-hover:opacity-[0.04] transition-opacity bg-current"
+            className="absolute inset-0 opacity-0 group-hover:opacity-[0.04] transition-opacity bg-current rounded-lg"
           />
         )}
       </div>

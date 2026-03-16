@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { AnimatePresence } from 'motion/react'
 import { SLOTS, dateKey } from '../../lib/slots'
 import { useCalendarStore } from '../../store/calendarStore'
@@ -7,6 +7,7 @@ import { NowLine } from './NowLine'
 import { NotePopup } from './NotePopup'
 import { useDragPaint } from '../../hooks/useDragPaint'
 import type { SlotEntry } from '../../store/calendarStore'
+import { computeSlotGroupPositions } from '../../lib/slotGroups'
 
 const SLOT_HEIGHT = 48
 const SCROLL_TO_INDEX = 16 // 08:00
@@ -32,6 +33,7 @@ export function CalendarGrid({ onStrokeComplete, onSaveNote }: CalendarGridProps
 
   const dk = dateKey(currentDate)
   const daySlots = slotData[dk] || {}
+  const groupPositions = useMemo(() => computeSlotGroupPositions(daySlots), [daySlots])
 
   const isToday = dk === dateKey(new Date())
 
@@ -109,6 +111,7 @@ export function CalendarGrid({ onStrokeComplete, onSaveNote }: CalendarGridProps
                 slotLabel={slot.label}
                 entry={daySlots[slot.key]}
                 isDragging={isDragging}
+                groupPosition={groupPositions[slot.key]}
                 onMouseDown={onSlotMouseDown}
                 onMouseEnter={onSlotMouseEnter}
                 onTouchStart={onSlotTouchStart}
