@@ -18,7 +18,7 @@ interface SlotCellProps {
   isDragging?: boolean
   onMouseDown: (dk: string, slotKey: string, e: React.MouseEvent) => void
   onMouseEnter: (dk: string, slotKey: string) => void
-  onTouchStart?: (dk: string, slotKey: string) => void
+  onTouchStart?: (dk: string, slotKey: string, x: number, y: number) => void
   onContextMenu: (e: React.MouseEvent, dk: string, slotKey: string) => void
   onNoteClick: (e: React.MouseEvent, dk: string, slotKey: string) => void
 }
@@ -96,8 +96,8 @@ export const SlotCell = memo(function SlotCell({
       onMouseMove={showSwap ? handleMouseMove : undefined}
       onTouchStart={(e) => {
         if (!activeCategoryId && !eraserOn) return
-        e.preventDefault()
-        onTouchStart?.(dk, slotKey)
+        const t = e.touches[0]
+        onTouchStart?.(dk, slotKey, t.clientX, t.clientY)
       }}
       onContextMenu={(e) => {
         e.preventDefault()

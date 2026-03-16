@@ -35,7 +35,7 @@ export function CalendarGrid({ onStrokeComplete, onSaveNote }: CalendarGridProps
 
   const isToday = dk === dateKey(new Date())
 
-  const { onSlotMouseDown, onSlotMouseEnter, onMouseUp, onSlotTouchStart, onTouchMove, onTouchEnd, isDragging } = useDragPaint(onStrokeComplete)
+  const { onSlotMouseDown, onSlotMouseEnter, onMouseUp, onSlotTouchStart, handleNativeTouchMove, handleNativeTouchEnd, isDragging } = useDragPaint(onStrokeComplete)
 
   const [notePopup, setNotePopup] = useState<{
     dk: string; slotKey: string; position: { x: number; y: number }
@@ -54,6 +54,17 @@ export function CalendarGrid({ onStrokeComplete, onSaveNote }: CalendarGridProps
     return () => window.removeEventListener('mouseup', onMouseUp)
   }, [onMouseUp])
 
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    el.addEventListener('touchmove', handleNativeTouchMove, { passive: false })
+    el.addEventListener('touchend', handleNativeTouchEnd)
+    return () => {
+      el.removeEventListener('touchmove', handleNativeTouchMove)
+      el.removeEventListener('touchend', handleNativeTouchEnd)
+    }
+  }, [handleNativeTouchMove, handleNativeTouchEnd])
+
   const handleContextMenu = useCallback((_e: React.MouseEvent, dk: string, slotKey: string) => {
     setFocusedSlot({ dateKey: dk, slotKey })
   }, [setFocusedSlot])
@@ -68,8 +79,6 @@ export function CalendarGrid({ onStrokeComplete, onSaveNote }: CalendarGridProps
         ref={scrollRef}
         className="flex-1 overflow-y-auto relative"
         onMouseLeave={onMouseUp}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
       >
         <div className="relative flex pt-3">
           {/* Hour labels gutter */}

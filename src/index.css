@@ -80,10 +80,6 @@ input[type="color"]::-webkit-color-swatch {
   border-radius: 4px;
 }
 
-[data-slot-key] {
-  touch-action: none;
-}
-
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
   html {
     padding-bottom: env(safe-area-inset-bottom);

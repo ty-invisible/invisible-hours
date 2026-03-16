@@ -40,7 +40,7 @@ export function WeekGrid({ onStrokeComplete, onSaveNote }: WeekGridProps) {
   }, [allWeekDates, showWeekends])
   const todayDk = dateKey(new Date())
 
-  const { onSlotMouseDown, onSlotMouseEnter, onMouseUp, onSlotTouchStart, onTouchMove, onTouchEnd, isDragging } = useDragPaint(onStrokeComplete)
+  const { onSlotMouseDown, onSlotMouseEnter, onMouseUp, onSlotTouchStart, handleNativeTouchMove, handleNativeTouchEnd, isDragging } = useDragPaint(onStrokeComplete)
 
   const [notePopup, setNotePopup] = useState<{
     dk: string; slotKey: string; position: { x: number; y: number }
@@ -58,6 +58,17 @@ export function WeekGrid({ onStrokeComplete, onSaveNote }: WeekGridProps) {
     window.addEventListener('mouseup', onMouseUp)
     return () => window.removeEventListener('mouseup', onMouseUp)
   }, [onMouseUp])
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    el.addEventListener('touchmove', handleNativeTouchMove, { passive: false })
+    el.addEventListener('touchend', handleNativeTouchEnd)
+    return () => {
+      el.removeEventListener('touchmove', handleNativeTouchMove)
+      el.removeEventListener('touchend', handleNativeTouchEnd)
+    }
+  }, [handleNativeTouchMove, handleNativeTouchEnd])
 
   const handleContextMenu = useCallback((_e: React.MouseEvent, dk: string, slotKey: string) => {
     setFocusedSlot({ dateKey: dk, slotKey })
@@ -96,8 +107,6 @@ export function WeekGrid({ onStrokeComplete, onSaveNote }: WeekGridProps) {
         ref={scrollRef}
         className="flex-1 overflow-y-auto"
         onMouseLeave={onMouseUp}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
       >
         <div className="flex pt-3">
           {/* Hour labels gutter */}
