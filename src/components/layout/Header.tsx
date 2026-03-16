@@ -203,12 +203,6 @@ export function Header({ user, sync }: HeaderProps) {
               <CopyIcon size={16} />
             </button>
             <button
-              onClick={() => setShowRestore(true)}
-              className="text-white/70 active:text-white w-8 h-8 flex items-center justify-center rounded-lg"
-            >
-              <UploadIcon size={16} />
-            </button>
-            <button
               onClick={() => supabase.auth.signOut()}
               className="text-white/50 active:text-white w-8 h-8 flex items-center justify-center rounded-lg"
             >
@@ -340,13 +334,6 @@ export function Header({ user, sync }: HeaderProps) {
             title="Copy Table"
           >
             <CopyIcon size={20} />
-          </button>
-          <button
-            onClick={() => setShowRestore(true)}
-            className="text-white/70 hover:text-white w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors"
-            title="Upload .TSX"
-          >
-            <UploadIcon size={20} />
           </button>
           <button
             onClick={() => supabase.auth.signOut()}

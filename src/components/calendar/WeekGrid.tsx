@@ -127,7 +127,7 @@ export function WeekGrid({ onStrokeComplete, onSaveNote }: WeekGridProps) {
           </div>
 
           {/* Day columns */}
-          <div className="flex-1 flex">
+          <div className="flex-1 flex gap-1">
             {visibleDays.map(({ date }) => {
               const dk = dateKey(date)
               const daySlots = slotData[dk] || {}

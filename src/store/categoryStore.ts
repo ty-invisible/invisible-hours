@@ -5,6 +5,7 @@ import { DEFAULT_CATEGORIES, mergeCategories, DEFAULT_CAT_IDS } from '../lib/cat
 interface CategoryState {
   categories: Category[]
   userCategories: Category[]
+  categoriesLoaded: boolean
   activeCategoryId: string | null
   eraserOn: boolean
 
@@ -24,6 +25,7 @@ interface CategoryState {
 export const useCategoryStore = create<CategoryState>((set, get) => ({
   categories: DEFAULT_CATEGORIES,
   userCategories: [],
+  categoriesLoaded: false,
   activeCategoryId: null,
   eraserOn: false,
 
@@ -31,6 +33,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     set({
       userCategories: cats,
       categories: mergeCategories(DEFAULT_CATEGORIES, cats),
+      categoriesLoaded: true,
     }),
 
   setActive: (catId) =>
