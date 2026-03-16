@@ -196,7 +196,7 @@ export function Header({ user, sync }: HeaderProps) {
           <button
             onClick={handleCopy}
             className="text-white/70 hover:text-white w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors"
-            title="Copy as TSV"
+            title="Copy Table"
           >
             <CopyIcon size={20} />
           </button>

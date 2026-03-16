@@ -49,6 +49,22 @@ export function useKeyboardShortcuts() {
         return
       }
 
+      // A => add new category
+      if (e.key === 'a' || e.key === 'A') {
+        window.dispatchEvent(new CustomEvent('add-category'))
+        return
+      }
+
+      // W => week view, D => day view
+      if (e.key === 'w' || e.key === 'W') {
+        useCalendarStore.getState().setViewMode('week')
+        return
+      }
+      if (e.key === 'd' || e.key === 'D') {
+        useCalendarStore.getState().setViewMode('day')
+        return
+      }
+
       // Arrow left/right => navigate calendar
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         e.preventDefault()

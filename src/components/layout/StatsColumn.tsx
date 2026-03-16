@@ -86,8 +86,8 @@ export function StatsColumn({ sync }: StatsColumnProps) {
     <div className="h-full flex flex-col bg-surface p-3 gap-4">
       <StatsTabs active={mode} onChange={setMode} />
 
-      {mode === '9-5' && (
-        <WorkDayRangePicker onSave={sync?.saveWorkDayRange} />
+      {(mode === '9-5' || mode === 'overtime') && (
+        <WorkDayRangePicker onSave={sync?.saveWorkDayRange} inverted={mode === 'overtime'} />
       )}
 
       <div className="flex justify-center">

@@ -14,9 +14,10 @@ function formatSlotTime(index: number, asEnd = false): string {
 
 interface WorkDayRangePickerProps {
   onSave?: () => Promise<void>
+  inverted?: boolean
 }
 
-export function WorkDayRangePicker({ onSave }: WorkDayRangePickerProps) {
+export function WorkDayRangePicker({ onSave, inverted }: WorkDayRangePickerProps) {
   const barRef = useRef<HTMLDivElement>(null)
   const workDayStartIndex = useUIStore((s) => s.workDayStartIndex)
   const workDayEndIndex = useUIStore((s) => s.workDayEndIndex)
@@ -76,7 +77,7 @@ export function WorkDayRangePicker({ onSave }: WorkDayRangePickerProps) {
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between text-xs text-muted">
-        <span>Work hours</span>
+        <span>Range</span>
         <span className="font-medium text-text">
           {formatSlotTime(workDayStartIndex)} – {formatSlotTime(workDayEndIndex, true)}
         </span>
@@ -88,11 +89,27 @@ export function WorkDayRangePicker({ onSave }: WorkDayRangePickerProps) {
           role="slider"
           aria-label="Work day time range"
         >
-        {/* Filled range */}
-        <div
-          className="absolute top-0 bottom-0 rounded-md bg-accent/30 transition-none"
-          style={{ left: `${startPct}%`, width: `${endPct - startPct}%` }}
-        />
+        {inverted ? (
+          <>
+            {startPct > 0 && (
+              <div
+                className="absolute top-0 bottom-0 rounded-md bg-accent/30 transition-none"
+                style={{ left: 0, width: `${startPct}%` }}
+              />
+            )}
+            {endPct < 100 && (
+              <div
+                className="absolute top-0 bottom-0 rounded-md bg-accent/30 transition-none"
+                style={{ left: `${endPct}%`, width: `${100 - endPct}%` }}
+              />
+            )}
+          </>
+        ) : (
+          <div
+            className="absolute top-0 bottom-0 rounded-md bg-accent/30 transition-none"
+            style={{ left: `${startPct}%`, width: `${endPct - startPct}%` }}
+          />
+        )}
         {/* Start handle */}
         <div
           className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-accent border-2 border-surface shadow cursor-ew-resize z-10 hover:scale-110 transition-transform"

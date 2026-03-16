@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useCategoryStore } from '../../store/categoryStore'
 import { CategoryRow } from '../palette/CategoryRow'
 import { MoreAccordion } from '../palette/MoreAccordion'
@@ -21,6 +21,7 @@ export function PaletteColumn({ sync }: PaletteColumnProps) {
   const reorder = useCategoryStore((s) => s.reorder)
 
   const dragFrom = useRef<number | null>(null)
+  const addBtnRef = useRef<HTMLButtonElement>(null)
   const [showNewEditor, setShowNewEditor] = useState(false)
   const [newEditorPos, setNewEditorPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
 
@@ -48,10 +49,25 @@ export function PaletteColumn({ sync }: PaletteColumnProps) {
     sync.saveCategories()
   }, [sync])
 
-  const handleAddClick = (e: React.MouseEvent) => {
-    setNewEditorPos({ x: e.clientX, y: e.clientY })
+  const openAddEditor = useCallback((x: number, y: number) => {
+    setNewEditorPos({ x, y })
     setShowNewEditor(true)
+  }, [])
+
+  const handleAddClick = (e: React.MouseEvent) => {
+    openAddEditor(e.clientX, e.clientY)
   }
+
+  useEffect(() => {
+    const handler = () => {
+      if (addBtnRef.current) {
+        const rect = addBtnRef.current.getBoundingClientRect()
+        openAddEditor(rect.left + rect.width / 2, rect.top + rect.height / 2)
+      }
+    }
+    window.addEventListener('add-category', handler)
+    return () => window.removeEventListener('add-category', handler)
+  }, [openAddEditor])
 
   return (
     <div className="h-full flex flex-col bg-surface px-4 py-3">
@@ -102,6 +118,7 @@ export function PaletteColumn({ sync }: PaletteColumnProps) {
       <div className="mt-2 flex gap-1.5 flex-shrink-0">
         <EraserButton />
         <button
+          ref={addBtnRef}
           onClick={handleAddClick}
           className="flex-1 h-14 flex flex-col items-center justify-center gap-1 rounded-lg text-xs bg-bg text-muted hover:text-text transition-colors"
         >
