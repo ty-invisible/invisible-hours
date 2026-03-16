@@ -35,7 +35,7 @@ export function CalendarGrid({ onStrokeComplete, onSaveNote }: CalendarGridProps
 
   const isToday = dk === dateKey(new Date())
 
-  const { onSlotMouseDown, onSlotMouseEnter, onMouseUp, isDragging } = useDragPaint(onStrokeComplete)
+  const { onSlotMouseDown, onSlotMouseEnter, onMouseUp, onSlotTouchStart, onTouchMove, onTouchEnd, isDragging } = useDragPaint(onStrokeComplete)
 
   const [notePopup, setNotePopup] = useState<{
     dk: string; slotKey: string; position: { x: number; y: number }
@@ -68,6 +68,8 @@ export function CalendarGrid({ onStrokeComplete, onSaveNote }: CalendarGridProps
         ref={scrollRef}
         className="flex-1 overflow-y-auto relative"
         onMouseLeave={onMouseUp}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
       >
         <div className="relative flex pt-3">
           {/* Hour labels gutter */}
@@ -100,6 +102,7 @@ export function CalendarGrid({ onStrokeComplete, onSaveNote }: CalendarGridProps
                 isDragging={isDragging}
                 onMouseDown={onSlotMouseDown}
                 onMouseEnter={onSlotMouseEnter}
+                onTouchStart={onSlotTouchStart}
                 onContextMenu={handleContextMenu}
                 onNoteClick={handleNoteClick}
               />

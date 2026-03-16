@@ -8,10 +8,12 @@ import { CalendarColumn } from '../components/layout/CalendarColumn'
 import { StatsColumn } from '../components/layout/StatsColumn'
 import { ResizeHandle } from '../components/ui/ResizeHandle'
 import { ToastContainer } from '../components/ui/Toast'
-import { useUIStore } from '../store/uiStore'
+import { useUIStore, type MobileTab } from '../store/uiStore'
 import { useSupabaseSync } from '../hooks/useSupabaseSync'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { useThemeSync } from '../hooks/useThemeSync'
+import { useIsMobile } from '../hooks/useIsMobile'
+import { SwatchIcon, CalendarIcon, BarChartIcon } from '../components/ui/Icons'
 
 export default function App() {
   useThemeSync()
@@ -73,14 +75,31 @@ export default function App() {
 }
 
 function AuthenticatedApp({ user }: { user: User }) {
+  const isMobile = useIsMobile()
   const paletteWidth = useUIStore((s) => s.paletteWidth)
   const statsWidth = useUIStore((s) => s.statsWidth)
   const setPaletteWidth = useUIStore((s) => s.setPaletteWidth)
   const setStatsWidth = useUIStore((s) => s.setStatsWidth)
   const focusMode = useUIStore((s) => s.focusMode)
+  const mobileTab = useUIStore((s) => s.mobileTab)
 
   const sync = useSupabaseSync(user)
   useKeyboardShortcuts()
+
+  if (isMobile) {
+    return (
+      <div className="h-full flex flex-col overflow-hidden">
+        <Header user={user} sync={sync} />
+        <div className="flex-1 min-h-0 overflow-hidden">
+          {mobileTab === 'palette' && <PaletteColumn sync={sync} />}
+          {mobileTab === 'calendar' && <CalendarColumn sync={sync} />}
+          {mobileTab === 'stats' && <StatsColumn sync={sync} />}
+        </div>
+        <MobileTabBar />
+        <ToastContainer />
+      </div>
+    )
+  }
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -120,5 +139,36 @@ function AuthenticatedApp({ user }: { user: User }) {
       </div>
       <ToastContainer />
     </div>
+  )
+}
+
+const TABS: { id: MobileTab; label: string; Icon: typeof CalendarIcon }[] = [
+  { id: 'palette', label: 'Categories', Icon: SwatchIcon },
+  { id: 'calendar', label: 'Calendar', Icon: CalendarIcon },
+  { id: 'stats', label: 'Stats', Icon: BarChartIcon },
+]
+
+function MobileTabBar() {
+  const mobileTab = useUIStore((s) => s.mobileTab)
+  const setMobileTab = useUIStore((s) => s.setMobileTab)
+
+  return (
+    <nav className="flex-shrink-0 bg-surface border-t border-border flex" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+      {TABS.map(({ id, label, Icon }) => {
+        const active = mobileTab === id
+        return (
+          <button
+            key={id}
+            onClick={() => setMobileTab(id)}
+            className={`flex-1 flex flex-col items-center gap-0.5 py-2 transition-colors ${
+              active ? 'text-accent' : 'text-muted'
+            }`}
+          >
+            <Icon size={20} />
+            <span className="text-[10px] font-medium">{label}</span>
+          </button>
+        )
+      })}
+    </nav>
   )
 }

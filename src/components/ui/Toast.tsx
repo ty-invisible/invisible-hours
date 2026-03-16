@@ -31,7 +31,7 @@ export function ToastContainer() {
   const toasts = useUIStore((s) => s.toastQueue)
 
   return (
-    <div className="fixed bottom-4 right-4 flex flex-col gap-2 z-50">
+    <div className="fixed bottom-14 left-4 right-4 md:left-auto md:bottom-4 flex flex-col items-end gap-2 z-50">
       <AnimatePresence>
         {toasts.map((t) => (
           <ToastItem key={t.id} toast={t} />

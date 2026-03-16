@@ -3,6 +3,7 @@ import { WORKDAY_START_DEFAULT, WORKDAY_END_DEFAULT } from '../lib/slots'
 
 export type SaveStatus = 'idle' | 'saving' | 'saved'
 export type Theme = 'light' | 'dark' | 'system'
+export type MobileTab = 'palette' | 'calendar' | 'stats'
 
 export interface Toast {
   id: string
@@ -20,6 +21,7 @@ interface UIState {
   theme: Theme
   showWeekends: boolean
   focusMode: boolean
+  mobileTab: MobileTab
 
   setPaletteWidth: (w: number) => void
   setStatsWidth: (w: number) => void
@@ -30,6 +32,7 @@ interface UIState {
   setTheme: (t: Theme) => void
   setShowWeekends: (show: boolean) => void
   toggleFocusMode: () => void
+  setMobileTab: (tab: MobileTab) => void
 }
 
 const PALETTE_KEY = 'idt-palette-w'
@@ -87,6 +90,7 @@ export const useUIStore = create<UIState>((set) => ({
   theme: loadTheme(),
   showWeekends: loadShowWeekends(),
   focusMode: false,
+  mobileTab: 'calendar',
 
   setPaletteWidth: (w) => {
     localStorage.setItem(PALETTE_KEY, String(w))
@@ -116,6 +120,8 @@ export const useUIStore = create<UIState>((set) => ({
   },
 
   toggleFocusMode: () => set((state) => ({ focusMode: !state.focusMode })),
+
+  setMobileTab: (tab) => set({ mobileTab: tab }),
 
   setSaveStatus: (s) => set({ saveStatus: s }),
 

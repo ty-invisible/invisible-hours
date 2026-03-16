@@ -95,7 +95,7 @@ export function CategoryEditor({ catId, position, onClose, onSave, onDeleteAllEn
         initial={{ opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.96 }}
-        className="bg-surface border border-border rounded-xl shadow-xl p-6 w-[340px]"
+        className="bg-surface border border-border rounded-xl shadow-xl p-6 w-[340px] max-w-[calc(100vw-2rem)]"
         onClick={(e) => e.stopPropagation()}
       >
         <h4 className="text-base font-semibold mb-4">

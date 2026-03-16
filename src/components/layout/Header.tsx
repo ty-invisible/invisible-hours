@@ -9,6 +9,7 @@ import { buildSummary } from '../../lib/buildSummary'
 import { ChevronLeft, ChevronRight, CopyIcon, UploadIcon, LogOutIcon, SunIcon, MoonIcon } from '../ui/Icons'
 import { useUIStore } from '../../store/uiStore'
 import { useResolvedTheme } from '../../hooks/useThemeSync'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import { RestoreModal } from './RestoreModal'
 
 interface HeaderProps {
@@ -19,6 +20,7 @@ interface HeaderProps {
 }
 
 export function Header({ user, sync }: HeaderProps) {
+  const isMobile = useIsMobile()
   const currentDate = useCalendarStore((s) => s.currentDate)
   const viewMode = useCalendarStore((s) => s.viewMode)
   const setCurrentDate = useCalendarStore((s) => s.setCurrentDate)
@@ -57,6 +59,15 @@ export function Header({ user, sync }: HeaderProps) {
   const dateLabel = useMemo(() => {
     const thisYear = new Date().getFullYear()
     if (viewMode === 'day') {
+      if (isMobile) {
+        const opts: Intl.DateTimeFormatOptions = {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+        }
+        if (currentDate.getFullYear() !== thisYear) opts.year = 'numeric'
+        return currentDate.toLocaleDateString('en-US', opts)
+      }
       const opts: Intl.DateTimeFormatOptions = {
         weekday: 'long',
         month: 'long',
@@ -74,7 +85,7 @@ export function Header({ user, sync }: HeaderProps) {
       const yearSuffix = mon.getFullYear() !== thisYear ? `, ${mon.getFullYear()}` : ''
       return `${fmt(mon)} – ${fmt(sun)}${yearSuffix}`
     }
-  }, [currentDate, viewMode])
+  }, [currentDate, viewMode, isMobile])
 
   const handleCopy = () => {
     const dates = viewMode === 'day'
@@ -83,6 +94,136 @@ export function Header({ user, sync }: HeaderProps) {
     const tsv = buildSummary(dates, slotData, getCategoryLabel)
     navigator.clipboard.writeText(tsv)
     addToast({ message: 'Copied to clipboard', type: 'success' })
+  }
+
+  if (isMobile) {
+    return (
+      <>
+        <header className="bg-header flex-shrink-0 px-3" style={{ zIndex: 40 }}>
+          {/* Row 1: brand + date nav */}
+          <div className="h-11 flex items-center gap-2">
+            <span className="text-white font-semibold text-xs whitespace-nowrap">IH™</span>
+            <div className="flex-1 flex items-center justify-center gap-1">
+              <button
+                onClick={() => navigate(-1)}
+                className="text-white/70 active:text-white w-8 h-8 flex items-center justify-center rounded-lg"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <span className="text-white text-xs font-medium text-center">
+                {dateLabel}
+              </span>
+              <button
+                onClick={() => navigate(1)}
+                className="text-white/70 active:text-white w-8 h-8 flex items-center justify-center rounded-lg"
+              >
+                <ChevronRight size={18} />
+              </button>
+            </div>
+            <AnimatePresence initial={false}>
+              {!isToday && (
+                <motion.button
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ duration: 0.15 }}
+                  onClick={goToday}
+                  className="px-2.5 py-1 rounded-md bg-accent text-white text-xs font-medium"
+                >
+                  Today
+                </motion.button>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Row 2: toggles + action icons */}
+          <div className="h-9 flex items-center gap-1.5 pb-1">
+            <div className="flex bg-white/10 rounded-md p-0.5">
+              <button
+                onClick={() => setViewMode('day')}
+                className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                  viewMode === 'day' ? 'bg-white text-header' : 'text-white/70'
+                }`}
+              >
+                Day
+              </button>
+              <button
+                onClick={() => setViewMode('week')}
+                className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                  viewMode === 'week' ? 'bg-white text-header' : 'text-white/70'
+                }`}
+              >
+                Week
+              </button>
+            </div>
+
+            <AnimatePresence>
+              {viewMode === 'week' && (
+                <motion.div
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: 'auto' }}
+                  exit={{ opacity: 0, width: 0 }}
+                  transition={{ duration: 0.15 }}
+                  className="overflow-hidden"
+                >
+                  <div className="flex bg-white/10 rounded-md p-0.5">
+                    <button
+                      onClick={() => setShowWeekends(false)}
+                      className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                        !showWeekends ? 'bg-white text-header' : 'text-white/70'
+                      }`}
+                    >
+                      5d
+                    </button>
+                    <button
+                      onClick={() => setShowWeekends(true)}
+                      className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                        showWeekends ? 'bg-white text-header' : 'text-white/70'
+                      }`}
+                    >
+                      7d
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="flex-1" />
+
+            <button
+              onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+              className="text-white/70 active:text-white w-8 h-8 flex items-center justify-center rounded-lg"
+            >
+              {resolvedTheme === 'dark' ? <SunIcon size={16} /> : <MoonIcon size={16} />}
+            </button>
+            <button
+              onClick={handleCopy}
+              className="text-white/70 active:text-white w-8 h-8 flex items-center justify-center rounded-lg"
+            >
+              <CopyIcon size={16} />
+            </button>
+            <button
+              onClick={() => setShowRestore(true)}
+              className="text-white/70 active:text-white w-8 h-8 flex items-center justify-center rounded-lg"
+            >
+              <UploadIcon size={16} />
+            </button>
+            <button
+              onClick={() => supabase.auth.signOut()}
+              className="text-white/50 active:text-white w-8 h-8 flex items-center justify-center rounded-lg"
+            >
+              <LogOutIcon size={16} />
+            </button>
+          </div>
+        </header>
+        {showRestore && (
+          <RestoreModal
+            onClose={() => setShowRestore(false)}
+            onImport={sync.bulkImportEntries}
+          />
+        )}
+      </>
+    )
   }
 
   return (

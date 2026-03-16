@@ -7,11 +7,25 @@ interface DragPaintResult {
   onSlotMouseDown: (dk: string, slotKey: string, e: React.MouseEvent) => void
   onSlotMouseEnter: (dk: string, slotKey: string) => void
   onMouseUp: () => void
+  onSlotTouchStart: (dk: string, slotKey: string) => void
+  onTouchMove: (e: React.TouchEvent) => void
+  onTouchEnd: () => void
   isDragging: boolean
 }
 
 function slotKeyFromIndex(i: number): string {
   return SLOTS[i].key
+}
+
+function resolveSlotFromPoint(x: number, y: number): { dk: string; slotKey: string } | null {
+  const el = document.elementFromPoint(x, y)
+  if (!el) return null
+  const slotEl = (el as HTMLElement).closest('[data-dk][data-slot-key]') as HTMLElement | null
+  if (!slotEl) return null
+  const dk = slotEl.dataset.dk
+  const slotKey = slotEl.dataset.slotKey
+  if (!dk || !slotKey) return null
+  return { dk, slotKey }
 }
 
 export function useDragPaint(onStrokeComplete?: (dk: string, changes: Record<string, SlotEntry | null>) => void): DragPaintResult {
@@ -68,9 +82,29 @@ export function useDragPaint(onStrokeComplete?: (dk: string, changes: Record<str
     }
   }, [paintSlot])
 
-  const onSlotMouseDown = useCallback((dk: string, slotKey: string, e: React.MouseEvent) => {
-    e.preventDefault()
+  const enterSlot = useCallback((dk: string, slotKey: string) => {
+    if (!isDragging.current) return
+    if (dk !== dragDateKey.current) return
+    if (slotKey === dragLastKey.current) return
 
+    const currentIdx = SLOT_INDEX[slotKey]
+    const lastIdx = SLOT_INDEX[dragLastKey.current]
+
+    if (dragStroke.current.has(slotKey)) {
+      const minIdx = Math.min(currentIdx, lastIdx)
+      const maxIdx = Math.max(currentIdx, lastIdx)
+
+      for (let i = minIdx; i <= maxIdx; i++) {
+        restoreSlot(dk, slotKeyFromIndex(i))
+      }
+    } else {
+      fillGap(dk, dragLastKey.current, slotKey)
+    }
+
+    dragLastKey.current = slotKey
+  }, [restoreSlot, fillGap])
+
+  const beginStroke = useCallback((dk: string, slotKey: string) => {
     const { activeCategoryId, eraserOn } = useCategoryStore.getState()
     const { slotData, pushUndo } = useCalendarStore.getState()
 
@@ -94,7 +128,6 @@ export function useDragPaint(onStrokeComplete?: (dk: string, changes: Record<str
       dragCategoryId.current = null
       paintSlot(dk, slotKey)
     } else if (activeCategoryId) {
-      // Toggle clear: if slot already has the active category, erase instead
       if (existing && existing.categoryId === activeCategoryId) {
         dragMode.current = 'erase'
         dragCategoryId.current = null
@@ -107,31 +140,7 @@ export function useDragPaint(onStrokeComplete?: (dk: string, changes: Record<str
     }
   }, [paintSlot])
 
-  const onSlotMouseEnter = useCallback((dk: string, slotKey: string) => {
-    if (!isDragging.current) return
-    if (dk !== dragDateKey.current) return
-    if (slotKey === dragLastKey.current) return
-
-    const currentIdx = SLOT_INDEX[slotKey]
-    const lastIdx = SLOT_INDEX[dragLastKey.current]
-
-    // Rubber-band: if we re-enter a slot already in the stroke, restore the range
-    if (dragStroke.current.has(slotKey)) {
-      const minIdx = Math.min(currentIdx, lastIdx)
-      const maxIdx = Math.max(currentIdx, lastIdx)
-
-      for (let i = minIdx; i <= maxIdx; i++) {
-        restoreSlot(dk, slotKeyFromIndex(i))
-      }
-    } else {
-      // Fill all slots between last and current (handles fast mouse movement)
-      fillGap(dk, dragLastKey.current, slotKey)
-    }
-
-    dragLastKey.current = slotKey
-  }, [restoreSlot, fillGap])
-
-  const onMouseUp = useCallback(() => {
+  const endStroke = useCallback(() => {
     if (!isDragging.current) return
     isDragging.current = false
     setIsDraggingState(false)
@@ -146,10 +155,44 @@ export function useDragPaint(onStrokeComplete?: (dk: string, changes: Record<str
     }
   }, [onStrokeComplete])
 
+  const onSlotMouseDown = useCallback((dk: string, slotKey: string, e: React.MouseEvent) => {
+    e.preventDefault()
+    beginStroke(dk, slotKey)
+  }, [beginStroke])
+
+  const onSlotMouseEnter = useCallback((dk: string, slotKey: string) => {
+    enterSlot(dk, slotKey)
+  }, [enterSlot])
+
+  const onMouseUp = useCallback(() => {
+    endStroke()
+  }, [endStroke])
+
+  const onSlotTouchStart = useCallback((dk: string, slotKey: string) => {
+    beginStroke(dk, slotKey)
+  }, [beginStroke])
+
+  const onTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isDragging.current) return
+    e.preventDefault()
+    const touch = e.touches[0]
+    const hit = resolveSlotFromPoint(touch.clientX, touch.clientY)
+    if (hit) {
+      enterSlot(hit.dk, hit.slotKey)
+    }
+  }, [enterSlot])
+
+  const onTouchEnd = useCallback(() => {
+    endStroke()
+  }, [endStroke])
+
   return {
     onSlotMouseDown,
     onSlotMouseEnter,
     onMouseUp,
+    onSlotTouchStart,
+    onTouchMove,
+    onTouchEnd,
     isDragging: isDraggingState,
   }
 }

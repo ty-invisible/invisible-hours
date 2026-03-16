@@ -18,13 +18,14 @@ interface SlotCellProps {
   isDragging?: boolean
   onMouseDown: (dk: string, slotKey: string, e: React.MouseEvent) => void
   onMouseEnter: (dk: string, slotKey: string) => void
+  onTouchStart?: (dk: string, slotKey: string) => void
   onContextMenu: (e: React.MouseEvent, dk: string, slotKey: string) => void
   onNoteClick: (e: React.MouseEvent, dk: string, slotKey: string) => void
 }
 
 export const SlotCell = memo(function SlotCell({
   dk, slotKey, entry, isWeekView, isDragging,
-  onMouseDown, onMouseEnter, onContextMenu, onNoteClick,
+  onMouseDown, onMouseEnter, onTouchStart, onContextMenu, onNoteClick,
 }: SlotCellProps) {
   const activeCategoryId = useCategoryStore((s) => s.activeCategoryId)
   const eraserOn = useCategoryStore((s) => s.eraserOn)
@@ -74,6 +75,8 @@ export const SlotCell = memo(function SlotCell({
 
   return (
     <div
+      data-dk={dk}
+      data-slot-key={slotKey}
       className={`group relative flex items-center select-none ${
         isWeekView ? 'h-[44px]' : 'h-[48px]'
       } ${isHourStart ? 'border-t border-border/40' : 'border-t border-border/15'}
@@ -91,6 +94,11 @@ export const SlotCell = memo(function SlotCell({
       }}
       onMouseEnter={() => onMouseEnter(dk, slotKey)}
       onMouseMove={showSwap ? handleMouseMove : undefined}
+      onTouchStart={(e) => {
+        if (!activeCategoryId && !eraserOn) return
+        e.preventDefault()
+        onTouchStart?.(dk, slotKey)
+      }}
       onContextMenu={(e) => {
         e.preventDefault()
         if (isFilled) onContextMenu(e, dk, slotKey)

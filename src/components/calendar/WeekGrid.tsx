@@ -40,7 +40,7 @@ export function WeekGrid({ onStrokeComplete, onSaveNote }: WeekGridProps) {
   }, [allWeekDates, showWeekends])
   const todayDk = dateKey(new Date())
 
-  const { onSlotMouseDown, onSlotMouseEnter, onMouseUp, isDragging } = useDragPaint(onStrokeComplete)
+  const { onSlotMouseDown, onSlotMouseEnter, onMouseUp, onSlotTouchStart, onTouchMove, onTouchEnd, isDragging } = useDragPaint(onStrokeComplete)
 
   const [notePopup, setNotePopup] = useState<{
     dk: string; slotKey: string; position: { x: number; y: number }
@@ -96,6 +96,8 @@ export function WeekGrid({ onStrokeComplete, onSaveNote }: WeekGridProps) {
         ref={scrollRef}
         className="flex-1 overflow-y-auto"
         onMouseLeave={onMouseUp}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
       >
         <div className="flex pt-3">
           {/* Hour labels gutter */}
@@ -132,6 +134,7 @@ export function WeekGrid({ onStrokeComplete, onSaveNote }: WeekGridProps) {
                       isDragging={isDragging}
                       onMouseDown={onSlotMouseDown}
                       onMouseEnter={onSlotMouseEnter}
+                      onTouchStart={onSlotTouchStart}
                       onContextMenu={handleContextMenu}
                       onNoteClick={handleNoteClick}
                     />
