@@ -14,12 +14,19 @@ export function MoreAccordion({ count, children }: MoreAccordionProps) {
     <div>
       <button
         onClick={() => setOpen(!open)}
-        className="w-full text-left text-sm text-muted hover:text-text px-2 py-2 transition-colors flex items-center gap-1.5"
+        className="w-full flex items-center py-3 group cursor-pointer"
       >
-        <span className="transition-transform" style={{ transform: open ? 'rotate(90deg)' : '', display: 'flex' }}>
-          <ChevronRightSmall size={16} />
+        <div className="flex-1 h-px bg-border" />
+        <span className="flex items-center gap-1 px-2.5 text-xs text-muted group-hover:text-text transition-colors">
+          {open ? `${count} Less` : `${count} More`}
+          <span
+            className="transition-transform duration-200"
+            style={{ transform: open ? 'rotate(-90deg)' : 'rotate(90deg)', display: 'flex' }}
+          >
+            <ChevronRightSmall size={14} />
+          </span>
         </span>
-        {open ? 'Less' : `More (${count})`}
+        <div className="flex-1 h-px bg-border" />
       </button>
       <AnimatePresence>
         {open && (

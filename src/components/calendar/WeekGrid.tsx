@@ -40,7 +40,7 @@ export function WeekGrid({ onStrokeComplete, onSaveNote }: WeekGridProps) {
   }, [allWeekDates, showWeekends])
   const todayDk = dateKey(new Date())
 
-  const { onSlotMouseDown, onSlotMouseEnter, onMouseUp } = useDragPaint(onStrokeComplete)
+  const { onSlotMouseDown, onSlotMouseEnter, onMouseUp, isDragging } = useDragPaint(onStrokeComplete)
 
   const [notePopup, setNotePopup] = useState<{
     dk: string; slotKey: string; position: { x: number; y: number }
@@ -129,6 +129,7 @@ export function WeekGrid({ onStrokeComplete, onSaveNote }: WeekGridProps) {
                       slotLabel={slot.label}
                       entry={daySlots[slot.key]}
                       isWeekView
+                      isDragging={isDragging}
                       onMouseDown={onSlotMouseDown}
                       onMouseEnter={onSlotMouseEnter}
                       onContextMenu={handleContextMenu}

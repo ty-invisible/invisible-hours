@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react'
+import { useRef, useCallback, useState } from 'react'
 import { useCalendarStore, type SlotData, type SlotEntry } from '../store/calendarStore'
 import { useCategoryStore } from '../store/categoryStore'
 import { SLOT_INDEX, SLOTS } from '../lib/slots'
@@ -7,6 +7,7 @@ interface DragPaintResult {
   onSlotMouseDown: (dk: string, slotKey: string, e: React.MouseEvent) => void
   onSlotMouseEnter: (dk: string, slotKey: string) => void
   onMouseUp: () => void
+  isDragging: boolean
 }
 
 function slotKeyFromIndex(i: number): string {
@@ -15,6 +16,7 @@ function slotKeyFromIndex(i: number): string {
 
 export function useDragPaint(onStrokeComplete?: (dk: string, changes: Record<string, SlotEntry | null>) => void): DragPaintResult {
   const isDragging = useRef(false)
+  const [isDraggingState, setIsDraggingState] = useState(false)
   const dragDateKey = useRef<string>('')
   const dragLastKey = useRef<string>('')
   const dragMode = useRef<'paint' | 'erase'>('paint')
@@ -78,6 +80,7 @@ export function useDragPaint(onStrokeComplete?: (dk: string, changes: Record<str
     const existing = daySlots[slotKey]
 
     isDragging.current = true
+    setIsDraggingState(true)
     dragDateKey.current = dk
     dragLastKey.current = slotKey
     preStrokeSnapshot.current = { ...daySlots }
@@ -131,6 +134,7 @@ export function useDragPaint(onStrokeComplete?: (dk: string, changes: Record<str
   const onMouseUp = useCallback(() => {
     if (!isDragging.current) return
     isDragging.current = false
+    setIsDraggingState(false)
 
     const dk = dragDateKey.current
     const changes = { ...strokeChanges.current }
@@ -146,5 +150,6 @@ export function useDragPaint(onStrokeComplete?: (dk: string, changes: Record<str
     onSlotMouseDown,
     onSlotMouseEnter,
     onMouseUp,
+    isDragging: isDraggingState,
   }
 }

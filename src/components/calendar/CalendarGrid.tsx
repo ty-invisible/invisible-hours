@@ -35,7 +35,7 @@ export function CalendarGrid({ onStrokeComplete, onSaveNote }: CalendarGridProps
 
   const isToday = dk === dateKey(new Date())
 
-  const { onSlotMouseDown, onSlotMouseEnter, onMouseUp } = useDragPaint(onStrokeComplete)
+  const { onSlotMouseDown, onSlotMouseEnter, onMouseUp, isDragging } = useDragPaint(onStrokeComplete)
 
   const [notePopup, setNotePopup] = useState<{
     dk: string; slotKey: string; position: { x: number; y: number }
@@ -97,6 +97,7 @@ export function CalendarGrid({ onStrokeComplete, onSaveNote }: CalendarGridProps
                 slotKey={slot.key}
                 slotLabel={slot.label}
                 entry={daySlots[slot.key]}
+                isDragging={isDragging}
                 onMouseDown={onSlotMouseDown}
                 onMouseEnter={onSlotMouseEnter}
                 onContextMenu={handleContextMenu}

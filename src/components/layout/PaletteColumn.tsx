@@ -55,8 +55,8 @@ export function PaletteColumn({ sync }: PaletteColumnProps) {
 
   return (
     <div className="h-full flex flex-col bg-surface px-4 py-3">
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-visible">
-        <div className="flex flex-col gap-0.5 pt-0.5">
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        <div className="flex flex-col gap-1.5 pt-0.5">
           {visibleCats.map((cat, i) => (
             <CategoryRow
               key={cat.catId}
@@ -77,7 +77,7 @@ export function PaletteColumn({ sync }: PaletteColumnProps) {
 
         {overflowCats.length > 0 && (
           <MoreAccordion count={overflowCats.length}>
-            <div className="flex flex-col gap-0.5">
+            <div className="flex flex-col gap-1.5">
               {overflowCats.map((cat, i) => (
                 <CategoryRow
                   key={cat.catId}
