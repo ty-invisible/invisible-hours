@@ -18,7 +18,7 @@ export function StatsTabs({ active, onChange }: StatsTabsProps) {
         <button
           key={tab.value}
           onClick={() => onChange(tab.value)}
-          className={`flex-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+          className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
             active === tab.value
               ? 'bg-surface text-text shadow-sm ring-1 ring-border'
               : 'text-muted hover:text-text'

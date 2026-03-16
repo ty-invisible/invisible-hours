@@ -109,7 +109,7 @@ export function WeekGrid({ onStrokeComplete, onSaveNote }: WeekGridProps) {
         className="flex-1 overflow-y-auto"
         onMouseLeave={onMouseUp}
       >
-        <div className="flex pt-3">
+        <div className="flex pt-3 pb-3 pr-2">
           {/* Hour labels gutter */}
           <div className="w-12 flex-shrink-0 relative" style={{ height: SLOTS.length * WEEK_SLOT_HEIGHT }}>
             {SLOTS.map((slot) => {

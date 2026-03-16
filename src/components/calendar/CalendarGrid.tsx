@@ -82,7 +82,7 @@ export function CalendarGrid({ onStrokeComplete, onSaveNote }: CalendarGridProps
         className="flex-1 overflow-y-auto relative"
         onMouseLeave={onMouseUp}
       >
-        <div className="relative flex pt-3">
+        <div className="relative flex pt-3 pb-3 pr-2">
           {/* Hour labels gutter */}
           <div className="w-14 flex-shrink-0 relative" style={{ height: SLOTS.length * SLOT_HEIGHT }}>
             {SLOTS.map((slot) => {

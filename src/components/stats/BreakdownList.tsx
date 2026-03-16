@@ -37,7 +37,7 @@ export function BreakdownList({ items, hiddenCatIds, onToggleVisibility }: Break
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.04 }}
-            className={`group flex items-center gap-2 px-1 py-1 rounded-md cursor-pointer transition-colors hover:bg-bg ${
+            className={`group flex items-center gap-2 px-2.5 py-1 rounded-md cursor-pointer transition-colors hover:bg-bg ${
               isHidden ? 'opacity-40' : ''
             }`}
             onClick={() => onToggleVisibility(item.catId)}

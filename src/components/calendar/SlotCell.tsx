@@ -41,9 +41,6 @@ export const SlotCell = memo(function SlotCell({
   const eraserOn = useCategoryStore((s) => s.eraserOn)
   const getCategoryColor = useCategoryStore((s) => s.getCategoryColor)
   const getCategoryLabel = useCategoryStore((s) => s.getCategoryLabel)
-  const focusedSlot = useCalendarStore((s) => s.focusedSlot)
-
-  const isFocused = focusedSlot?.dateKey === dk && focusedSlot?.slotKey === slotKey
   const isFilled = !!entry
   const hasNote = isFilled && !!entry.note
 
@@ -91,7 +88,7 @@ export const SlotCell = memo(function SlotCell({
       className={`group relative flex items-center select-none ${
         isWeekView ? 'h-[44px]' : 'h-[48px]'
       } ${isHourStart ? 'border-t border-border/40' : 'border-t border-border/15'}
-      ${isFocused ? 'ring-2 ring-accent ring-inset z-10' : ''}`}
+      `}
       style={cursor ? { cursor } : undefined}
       onMouseDown={(e) => {
         if (e.button === 2) return
@@ -117,7 +114,7 @@ export const SlotCell = memo(function SlotCell({
       onDragStart={(e) => e.preventDefault()}
     >
       {/* Slot content */}
-      <div className="flex-1 h-full relative overflow-hidden">
+      <div className={`flex-1 h-full relative overflow-hidden ${roundedClass}`}>
         {isFilled ? (
           <div
             className={`absolute inset-0 flex items-center px-2 transition-[filter,opacity] duration-150 ${roundedClass} ${
@@ -140,12 +137,12 @@ export const SlotCell = memo(function SlotCell({
             {showSwap && (
               <div
                 ref={swapOverlayRef}
-                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none"
+                className="absolute inset-0 rounded-[inherit] opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none"
               />
             )}
             {showIdleHover && idleGradient && (
               <div
-                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
+                className="absolute inset-0 rounded-[inherit] opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
                 style={{
                   background: idleGradient,
                   backgroundSize: '300% 300%',
