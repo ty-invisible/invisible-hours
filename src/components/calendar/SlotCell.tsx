@@ -1,6 +1,5 @@
-import { memo, useRef, useCallback } from 'react'
-
-import { contrastColor } from '../../lib/categories'
+import { memo, useRef, useCallback, useMemo } from 'react'
+import { contrastColor, lighten } from '../../lib/categories'
 import { useCategoryStore } from '../../store/categoryStore'
 import { useCalendarStore, type SlotEntry } from '../../store/calendarStore'
 
@@ -49,6 +48,15 @@ export const SlotCell = memo(function SlotCell({
   const showCross = !isDragging && (eraserOn || (isFilled && activeCategoryId === entry.categoryId))
   const showSwap = !isDragging && isFilled && !eraserOn && !!activeCategoryId && activeCategoryId !== entry.categoryId
   const showPlus = !isDragging && !isFilled && !!activeCategoryId && !eraserOn
+
+  const showIdleHover = !isDragging && isFilled && !activeCategoryId && !eraserOn
+
+  const idleGradient = useMemo(() => {
+    if (!showIdleHover || !color) return undefined
+    const l1 = lighten(color, 0.18)
+    const l2 = lighten(color, 0.3)
+    return `linear-gradient(-45deg, ${color}, ${l1}, ${l2}, ${l1}, ${color})`
+  }, [showIdleHover, color])
 
   const swapColor = showSwap ? getCategoryColor(activeCategoryId) : undefined
   const swapOverlayRef = useRef<HTMLDivElement>(null)
@@ -112,6 +120,16 @@ export const SlotCell = memo(function SlotCell({
               <div
                 ref={swapOverlayRef}
                 className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none"
+              />
+            )}
+            {showIdleHover && idleGradient && (
+              <div
+                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
+                style={{
+                  background: idleGradient,
+                  backgroundSize: '300% 300%',
+                  animation: 'gradient-flow 6s ease infinite',
+                }}
               />
             )}
           </div>

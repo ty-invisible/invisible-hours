@@ -49,7 +49,7 @@ export function Header({ user, sync }: HeaderProps) {
     } else {
       d.setDate(d.getDate() + dir * 7)
     }
-    setCurrentDate(d)
+    setCurrentDate(d, dir)
   }
 
   const goToday = () => setCurrentDate(new Date())

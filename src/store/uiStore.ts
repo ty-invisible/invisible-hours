@@ -19,6 +19,7 @@ interface UIState {
   workDayEndIndex: number
   theme: Theme
   showWeekends: boolean
+  focusMode: boolean
 
   setPaletteWidth: (w: number) => void
   setStatsWidth: (w: number) => void
@@ -28,6 +29,7 @@ interface UIState {
   setWorkDayRange: (startIndex: number, endIndex: number) => void
   setTheme: (t: Theme) => void
   setShowWeekends: (show: boolean) => void
+  toggleFocusMode: () => void
 }
 
 const PALETTE_KEY = 'idt-palette-w'
@@ -84,6 +86,7 @@ export const useUIStore = create<UIState>((set) => ({
   workDayEndIndex: loadedEnd,
   theme: loadTheme(),
   showWeekends: loadShowWeekends(),
+  focusMode: false,
 
   setPaletteWidth: (w) => {
     localStorage.setItem(PALETTE_KEY, String(w))
@@ -111,6 +114,8 @@ export const useUIStore = create<UIState>((set) => ({
     localStorage.setItem(WEEKENDS_KEY, String(show))
     set({ showWeekends: show })
   },
+
+  toggleFocusMode: () => set((state) => ({ focusMode: !state.focusMode })),
 
   setSaveStatus: (s) => set({ saveStatus: s }),
 

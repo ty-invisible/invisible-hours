@@ -77,6 +77,7 @@ function AuthenticatedApp({ user }: { user: User }) {
   const statsWidth = useUIStore((s) => s.statsWidth)
   const setPaletteWidth = useUIStore((s) => s.setPaletteWidth)
   const setStatsWidth = useUIStore((s) => s.setStatsWidth)
+  const focusMode = useUIStore((s) => s.focusMode)
 
   const sync = useSupabaseSync(user)
   useKeyboardShortcuts()
@@ -85,29 +86,37 @@ function AuthenticatedApp({ user }: { user: User }) {
     <div className="h-full flex flex-col overflow-hidden">
       <Header user={user} sync={sync} />
       <div className="flex flex-1 min-h-0">
-        <div style={{ width: paletteWidth }} className="flex-shrink-0 overflow-hidden">
-          <PaletteColumn sync={sync} />
-        </div>
-        <ResizeHandle
-          min={140}
-          max={400}
-          current={paletteWidth}
-          onResize={setPaletteWidth}
-          direction="right"
-        />
+        {!focusMode && (
+          <>
+            <div style={{ width: paletteWidth }} className="flex-shrink-0 overflow-hidden">
+              <PaletteColumn sync={sync} />
+            </div>
+            <ResizeHandle
+              min={140}
+              max={400}
+              current={paletteWidth}
+              onResize={setPaletteWidth}
+              direction="right"
+            />
+          </>
+        )}
         <div className="flex-1 min-w-0 overflow-hidden">
           <CalendarColumn sync={sync} />
         </div>
-        <ResizeHandle
-          min={200}
-          max={480}
-          current={statsWidth}
-          onResize={setStatsWidth}
-          direction="left"
-        />
-        <div style={{ width: statsWidth }} className="flex-shrink-0 overflow-hidden">
-          <StatsColumn sync={sync} />
-        </div>
+        {!focusMode && (
+          <>
+            <ResizeHandle
+              min={200}
+              max={480}
+              current={statsWidth}
+              onResize={setStatsWidth}
+              direction="left"
+            />
+            <div style={{ width: statsWidth }} className="flex-shrink-0 overflow-hidden">
+              <StatsColumn sync={sync} />
+            </div>
+          </>
+        )}
       </div>
       <ToastContainer />
     </div>

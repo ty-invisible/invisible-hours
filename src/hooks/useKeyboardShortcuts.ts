@@ -1,10 +1,18 @@
 import { useEffect } from 'react'
 import { useCategoryStore } from '../store/categoryStore'
 import { useCalendarStore } from '../store/calendarStore'
+import { useUIStore } from '../store/uiStore'
 
 export function useKeyboardShortcuts() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + . => toggle focus mode (works even in inputs)
+      if ((e.metaKey || e.ctrlKey) && e.key === '.') {
+        e.preventDefault()
+        useUIStore.getState().toggleFocusMode()
+        return
+      }
+
       const target = e.target as HTMLElement
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
         return
@@ -38,6 +46,21 @@ export function useKeyboardShortcuts() {
       // E => toggle eraser
       if (e.key === 'e' || e.key === 'E') {
         toggleEraser()
+        return
+      }
+
+      // Arrow left/right => navigate calendar
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault()
+        const { currentDate, viewMode, setCurrentDate } = useCalendarStore.getState()
+        const next = new Date(currentDate)
+        const dir: -1 | 1 = e.key === 'ArrowLeft' ? -1 : 1
+        if (viewMode === 'week') {
+          next.setDate(next.getDate() + dir * 7)
+        } else {
+          next.setDate(next.getDate() + dir)
+        }
+        setCurrentDate(next, dir)
         return
       }
 

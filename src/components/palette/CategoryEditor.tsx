@@ -26,13 +26,11 @@ export function CategoryEditor({ catId, position, onClose, onSave, onDeleteAllEn
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        onClose()
-      }
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
   }, [onClose])
 
   const handleSave = () => {
@@ -86,86 +84,91 @@ export function CategoryEditor({ catId, position, onClose, onSave, onDeleteAllEn
 
   return (
     <motion.div
-      ref={ref}
-      initial={{ opacity: 0, scale: 0.96, y: -4 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.96 }}
-      className="fixed z-50 bg-surface border border-border rounded-xl shadow-xl p-4"
-      style={{
-        left: Math.min(position.x, window.innerWidth - 280),
-        top: Math.min(position.y, window.innerHeight - 340),
-        width: 260,
-      }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      onClick={onClose}
     >
-      <h4 className="text-sm font-semibold mb-3">{isNew ? 'New Category' : 'Edit Category'}</h4>
+      <motion.div
+        ref={ref}
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.96 }}
+        className="bg-surface border border-border rounded-xl shadow-xl p-6 w-[340px]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h4 className="text-base font-semibold mb-4">
+          {isNew ? 'New Category' : `Edit ${existing?.label ?? 'Category'}`}
+        </h4>
 
-      <label className="block mb-3">
-        <span className="text-xs text-muted mb-1 block">Name</span>
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="w-full px-2.5 py-1.5 rounded-lg border border-border bg-bg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
-          autoFocus
-        />
-      </label>
-
-      <div className="mb-3">
-        <span className="text-xs text-muted mb-1 block">Colour</span>
-        <div className="flex items-center gap-2">
+        <label className="block mb-4">
+          <span className="text-xs text-muted mb-1 block">Name</span>
           <input
-            type="color"
-            value={color.length === 7 ? color : '#888888'}
-            onChange={(e) => setColor(e.target.value)}
-            className="w-8 h-8 rounded-md cursor-pointer border border-border"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg border border-border bg-bg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
+            autoFocus
           />
-          <div className="flex items-center border border-border rounded-lg px-2 py-1 bg-bg flex-1">
-            <span className="text-xs text-muted mr-0.5">#</span>
+        </label>
+
+        <div className="mb-4">
+          <span className="text-xs text-muted mb-1 block">Colour</span>
+          <div className="flex items-center gap-2">
             <input
-              value={hexInput}
-              onChange={(e) => handleHexChange(e.target.value)}
-              className="bg-transparent text-sm w-full focus:outline-none font-mono"
-              maxLength={6}
+              type="color"
+              value={color.length === 7 ? color : '#888888'}
+              onChange={(e) => setColor(e.target.value)}
+              className="w-10 h-10 rounded-md cursor-pointer border border-border"
             />
+            <div className="flex items-center border border-border rounded-lg px-2 py-1 bg-bg flex-1">
+              <span className="text-xs text-muted mr-0.5">#</span>
+              <input
+                value={hexInput}
+                onChange={(e) => handleHexChange(e.target.value)}
+                className="bg-transparent text-sm w-full focus:outline-none font-mono"
+                maxLength={6}
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Preview */}
-      <div
-        className="rounded-lg px-3 py-2 mb-4 text-sm font-medium"
-        style={{ backgroundColor: color, color: contrastColor(color.length === 7 ? color : '#888888') }}
-      >
-        {name || 'Preview'}
-      </div>
+        <div
+          className="rounded-lg px-4 py-3 mb-5 text-sm font-medium"
+          style={{ backgroundColor: color, color: contrastColor(color.length === 7 ? color : '#888888') }}
+        >
+          {name || 'Preview'}
+        </div>
 
-      <div className="flex items-center gap-2">
-        {!isNew && (
+        <div className="flex items-center gap-2">
+          {!isNew && (
+            <button
+              onClick={handleDelete}
+              className={`text-sm px-3 py-1.5 rounded-md transition-colors ${
+                confirmDelete
+                  ? 'bg-error text-white'
+                  : 'text-error hover:bg-error/10'
+              }`}
+            >
+              {confirmDelete ? 'Confirm Delete' : 'Delete'}
+            </button>
+          )}
+          <div className="flex-1" />
           <button
-            onClick={handleDelete}
-            className={`text-xs px-2 py-1 rounded-md transition-colors ${
-              confirmDelete
-                ? 'bg-error text-white'
-                : 'text-error hover:bg-error/10'
-            }`}
+            onClick={onClose}
+            className="text-sm text-muted hover:text-text px-3 py-1.5 rounded-md transition-colors"
           >
-            {confirmDelete ? 'Confirm Delete' : 'Delete'}
+            Cancel
           </button>
-        )}
-        <div className="flex-1" />
-        <button
-          onClick={onClose}
-          className="text-xs text-muted hover:text-text px-2 py-1 rounded-md transition-colors"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={handleSave}
-          disabled={!name.trim()}
-          className="text-xs bg-header text-white px-3 py-1 rounded-md hover:opacity-90 disabled:opacity-50 transition-opacity font-medium"
-        >
-          Save
-        </button>
-      </div>
+          <button
+            onClick={handleSave}
+            disabled={!name.trim()}
+            className="text-sm bg-header text-white px-4 py-1.5 rounded-md hover:opacity-90 disabled:opacity-50 transition-opacity font-medium"
+          >
+            Save
+          </button>
+        </div>
+      </motion.div>
     </motion.div>
   )
 }

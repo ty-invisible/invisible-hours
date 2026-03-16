@@ -16,11 +16,12 @@ export interface UndoEntry {
 interface CalendarState {
   currentDate: Date
   viewMode: 'day' | 'week'
+  navDirection: -1 | 0 | 1
   slotData: Record<string, SlotData>
   undoStack: UndoEntry[]
   focusedSlot: { dateKey: string; slotKey: string } | null
 
-  setCurrentDate: (d: Date) => void
+  setCurrentDate: (d: Date, dir?: -1 | 1) => void
   setViewMode: (mode: 'day' | 'week') => void
   setSlotData: (dk: string, data: SlotData) => void
   mergeSlotData: (allData: Record<string, SlotData>) => void
@@ -41,11 +42,12 @@ const MAX_UNDO = 50
 export const useCalendarStore = create<CalendarState>((set, get) => ({
   currentDate: new Date(),
   viewMode: 'day',
+  navDirection: 0,
   slotData: {},
   undoStack: [],
   focusedSlot: null,
 
-  setCurrentDate: (d) => set({ currentDate: d }),
+  setCurrentDate: (d, dir) => set({ currentDate: d, navDirection: dir ?? 0 }),
   setViewMode: (mode) => set({ viewMode: mode }),
 
   setSlotData: (dk, data) =>

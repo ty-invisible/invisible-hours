@@ -1,5 +1,6 @@
-import { useCallback } from 'react'
+import { useCallback, useRef, useEffect } from 'react'
 import { useCalendarStore } from '../../store/calendarStore'
+import { dateKey } from '../../lib/slots'
 import { CalendarGrid } from '../calendar/CalendarGrid'
 import { WeekGrid } from '../calendar/WeekGrid'
 import type { SlotEntry } from '../../store/calendarStore'
@@ -13,6 +14,31 @@ interface CalendarColumnProps {
 
 export function CalendarColumn({ sync }: CalendarColumnProps) {
   const viewMode = useCalendarStore((s) => s.viewMode)
+  const currentDate = useCalendarStore((s) => s.currentDate)
+  const navDirection = useCalendarStore((s) => s.navDirection)
+  const contentRef = useRef<HTMLDivElement>(null)
+  const prevDateKey = useRef(dateKey(currentDate))
+
+  useEffect(() => {
+    const key = dateKey(currentDate)
+    if (key === prevDateKey.current || navDirection === 0) {
+      prevDateKey.current = key
+      return
+    }
+    prevDateKey.current = key
+
+    const el = contentRef.current
+    if (!el) return
+
+    const offset = navDirection * 16
+    el.style.transition = 'none'
+    el.style.transform = `translateX(${offset}px)`
+
+    requestAnimationFrame(() => {
+      el.style.transition = 'transform 0.25s cubic-bezier(0.25, 0.1, 0.25, 1)'
+      el.style.transform = 'translateX(0)'
+    })
+  }, [currentDate, navDirection])
 
   const onStrokeComplete = useCallback((dk: string, changes: Record<string, SlotEntry | null>) => {
     sync.saveEntries(dk, changes)
@@ -23,12 +49,14 @@ export function CalendarColumn({ sync }: CalendarColumnProps) {
   }, [sync])
 
   return (
-    <div className="h-full bg-surface border-x border-border">
-      {viewMode === 'day' ? (
-        <CalendarGrid onStrokeComplete={onStrokeComplete} onSaveNote={onSaveNote} />
-      ) : (
-        <WeekGrid onStrokeComplete={onStrokeComplete} onSaveNote={onSaveNote} />
-      )}
+    <div className="h-full bg-surface border-x border-border overflow-hidden">
+      <div ref={contentRef} className="h-full">
+        {viewMode === 'day' ? (
+          <CalendarGrid onStrokeComplete={onStrokeComplete} onSaveNote={onSaveNote} />
+        ) : (
+          <WeekGrid onStrokeComplete={onStrokeComplete} onSaveNote={onSaveNote} />
+        )}
+      </div>
     </div>
   )
 }
