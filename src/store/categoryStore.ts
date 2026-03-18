@@ -8,6 +8,7 @@ interface CategoryState {
   categoriesLoaded: boolean
   activeCategoryId: string | null
   eraserOn: boolean
+  allTimeTotals: Record<string, number>
 
   setUserCategories: (cats: Category[]) => void
   setActive: (catId: string | null) => void
@@ -18,6 +19,7 @@ interface CategoryState {
   updateCategory: (catId: string, updates: Partial<Category>) => void
   deleteCategory: (catId: string) => void
 
+  setAllTimeTotals: (totals: Record<string, number>) => void
   getCategoryLabel: (catId: string) => string
   getCategoryColor: (catId: string) => string
 }
@@ -28,6 +30,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
   categoriesLoaded: false,
   activeCategoryId: null,
   eraserOn: false,
+  allTimeTotals: {},
 
   setUserCategories: (cats) =>
     set({
@@ -119,6 +122,8 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
         activeCategoryId: state.activeCategoryId === catId ? null : state.activeCategoryId,
       }
     }),
+
+  setAllTimeTotals: (totals) => set({ allTimeTotals: totals }),
 
   getCategoryLabel: (catId) => {
     const cat = get().categories.find((c) => c.catId === catId)

@@ -1,4 +1,5 @@
 import { motion } from 'motion/react'
+import { useCategoryStore } from '../../store/categoryStore'
 import { EyeIcon, EyeOffIcon } from '../ui/Icons'
 
 interface BreakdownItem {
@@ -23,6 +24,8 @@ function formatDuration(mins: number): string {
 }
 
 export function BreakdownList({ items, hiddenCatIds, onToggleVisibility }: BreakdownListProps) {
+  const allTimeTotals = useCategoryStore((s) => s.allTimeTotals)
+
   if (items.length === 0) {
     return <div className="text-xs text-muted text-center py-4">No tracked time</div>
   }
@@ -31,6 +34,8 @@ export function BreakdownList({ items, hiddenCatIds, onToggleVisibility }: Break
     <div className="flex flex-col gap-1">
       {items.map((item, i) => {
         const isHidden = hiddenCatIds.has(item.catId)
+        const allTimeSlots = allTimeTotals[item.catId] ?? 0
+        const allTimeMinutes = allTimeSlots * 30
         return (
           <motion.div
             key={item.catId}
@@ -57,7 +62,10 @@ export function BreakdownList({ items, hiddenCatIds, onToggleVisibility }: Break
               </div>
             </div>
             <span className="text-sm truncate flex-1">{item.label}</span>
-            <span className="text-sm text-muted tabular-nums">{formatDuration(item.minutes)}</span>
+            <span className="text-sm text-muted tabular-nums">
+              <span className="group-hover:hidden">{formatDuration(item.minutes)}</span>
+              <span className="hidden group-hover:inline">All Time: {formatDuration(allTimeMinutes)}</span>
+            </span>
           </motion.div>
         )
       })}

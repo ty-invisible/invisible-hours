@@ -21,6 +21,7 @@ export function StatsColumn({ sync }: StatsColumnProps) {
   const categories = useCategoryStore((s) => s.categories)
   const getCategoryColor = useCategoryStore((s) => s.getCategoryColor)
   const getCategoryLabel = useCategoryStore((s) => s.getCategoryLabel)
+  const showWeekends = useUIStore((s) => s.showWeekends)
   const workDayStartIndex = useUIStore((s) => s.workDayStartIndex)
   const workDayEndIndex = useUIStore((s) => s.workDayEndIndex)
 
@@ -39,9 +40,13 @@ export function StatsColumn({ sync }: StatsColumnProps) {
   }, [])
 
   const stats = useMemo(() => {
-    const dates = viewMode === 'day'
-      ? [dateKey(currentDate)]
-      : getWeekDates(currentDate).map(dateKey)
+    let weekDates = viewMode === 'day'
+      ? [currentDate]
+      : getWeekDates(currentDate)
+    if (viewMode === 'week' && !showWeekends) {
+      weekDates = weekDates.filter((d) => d.getDay() !== 0 && d.getDay() !== 6)
+    }
+    const dates = weekDates.map(dateKey)
 
     const counts = new Map<string, number>()
 
@@ -80,7 +85,7 @@ export function StatsColumn({ sync }: StatsColumnProps) {
     }))
 
     return { segments, totalMinutes: visibleMinutes, breakdown }
-  }, [currentDate, viewMode, slotData, mode, workDayKeys, hiddenCatIds, categories, getCategoryColor, getCategoryLabel])
+  }, [currentDate, viewMode, slotData, mode, workDayKeys, hiddenCatIds, showWeekends, categories, getCategoryColor, getCategoryLabel])
 
   return (
     <div className="h-full flex flex-col bg-surface p-3 gap-4">

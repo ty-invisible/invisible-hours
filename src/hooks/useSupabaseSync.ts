@@ -89,13 +89,30 @@ export function useSupabaseSync(user: User | null) {
     }
   }, [user])
 
+  const loadAllTimeTotals = useCallback(async () => {
+    if (!user) return
+    const { data } = await supabase
+      .from('time_entries')
+      .select('category_id')
+      .eq('user_id', user.id)
+
+    if (data) {
+      const totals: Record<string, number> = {}
+      for (const row of data) {
+        totals[row.category_id] = (totals[row.category_id] ?? 0) + 1
+      }
+      useCategoryStore.getState().setAllTimeTotals(totals)
+    }
+  }, [user])
+
   // Initial load
   useEffect(() => {
     if (!user) return
     loadCategories()
     loadCurrentView()
     loadUserSettings()
-  }, [user, loadCategories, loadCurrentView, loadUserSettings])
+    loadAllTimeTotals()
+  }, [user, loadCategories, loadCurrentView, loadUserSettings, loadAllTimeTotals])
 
   // Reload when date/view changes
   useEffect(() => {
@@ -153,7 +170,8 @@ export function useSupabaseSync(user: User | null) {
     setSaveStatus('saved')
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => setSaveStatus('idle'), 2000)
-  }, [user, setSaveStatus])
+    loadAllTimeTotals()
+  }, [user, setSaveStatus, loadAllTimeTotals])
 
   const saveNote = useCallback(async (dk: string, slotKey: string, note: string) => {
     if (!user) return
@@ -198,10 +216,10 @@ export function useSupabaseSync(user: User | null) {
   const deleteAllEntriesForCategory = useCallback(async (catId: string) => {
     if (!user) return
     await supabase.from('time_entries').delete().eq('user_id', user.id).eq('category_id', catId)
-    // Reload current view to reflect deletions in state
     loadedDates.current.clear()
     await loadCurrentView()
-  }, [user, loadCurrentView])
+    loadAllTimeTotals()
+  }, [user, loadCurrentView, loadAllTimeTotals])
 
   const bulkImportEntries = useCallback(async (
     entries: Array<{ date: string; slot_key: string; category_id: string; note: string }>
@@ -214,10 +232,11 @@ export function useSupabaseSync(user: User | null) {
 
     loadedDates.current.clear()
     await loadCurrentView()
+    loadAllTimeTotals()
     setSaveStatus('saved')
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => setSaveStatus('idle'), 2000)
-  }, [user, setSaveStatus, loadCurrentView])
+  }, [user, setSaveStatus, loadCurrentView, loadAllTimeTotals])
 
   const saveWorkDayRange = useCallback(async () => {
     if (!user) return
