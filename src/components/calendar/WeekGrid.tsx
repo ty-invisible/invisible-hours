@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'motion/react'
 import { SLOTS, dateKey, getWeekDates } from '../../lib/slots'
 import { useCalendarStore } from '../../store/calendarStore'
 import { useUIStore } from '../../store/uiStore'
+import { useGoogleCalendarStore } from '../../store/googleCalendarStore'
+import { mapEventsToSlots } from '../../lib/googleCalendarSlots'
 import { SlotCell } from './SlotCell'
 import { NotePopup } from './NotePopup'
 import { useDragPaint } from '../../hooks/useDragPaint'
@@ -130,28 +132,19 @@ export function WeekGrid({ onStrokeComplete, onSaveNote }: WeekGridProps) {
           <div className="flex-1 flex gap-1">
             {visibleDays.map(({ date }) => {
               const dk = dateKey(date)
-              const daySlots = slotData[dk] || {}
-              const groupPositions = computeSlotGroupPositions(daySlots)
               return (
-                <div key={dk} className={`flex-1 ${dk === todayDk ? 'bg-accent/[0.03]' : ''}`}>
-                  {SLOTS.map((slot) => (
-                    <SlotCell
-                      key={slot.key}
-                      dk={dk}
-                      slotKey={slot.key}
-                      slotLabel={slot.label}
-                      entry={daySlots[slot.key]}
-                      isWeekView
-                      isDragging={isDragging}
-                      groupPosition={groupPositions[slot.key]}
-                      onMouseDown={onSlotMouseDown}
-                      onMouseEnter={onSlotMouseEnter}
-                      onTouchStart={onSlotTouchStart}
-                      onContextMenu={handleContextMenu}
-                      onNoteClick={handleNoteClick}
-                    />
-                  ))}
-                </div>
+                <WeekDayColumn
+                  key={dk}
+                  dk={dk}
+                  isToday={dk === todayDk}
+                  slotData={slotData}
+                  isDragging={isDragging}
+                  onSlotMouseDown={onSlotMouseDown}
+                  onSlotMouseEnter={onSlotMouseEnter}
+                  onSlotTouchStart={onSlotTouchStart}
+                  onContextMenu={handleContextMenu}
+                  onNoteClick={handleNoteClick}
+                />
               )
             })}
           </div>
@@ -170,6 +163,55 @@ export function WeekGrid({ onStrokeComplete, onSaveNote }: WeekGridProps) {
           />
         )}
       </AnimatePresence>
+    </div>
+  )
+}
+
+interface WeekDayColumnProps {
+  dk: string
+  isToday: boolean
+  slotData: Record<string, Record<string, import('../../store/calendarStore').SlotEntry>>
+  isDragging: boolean
+  onSlotMouseDown: (dk: string, slotKey: string, e: React.MouseEvent) => void
+  onSlotMouseEnter: (dk: string, slotKey: string) => void
+  onSlotTouchStart: (dk: string, slotKey: string, x: number, y: number) => void
+  onContextMenu: (e: React.MouseEvent, dk: string, slotKey: string) => void
+  onNoteClick: (e: React.MouseEvent, dk: string, slotKey: string) => void
+}
+
+function WeekDayColumn({
+  dk, isToday, slotData, isDragging,
+  onSlotMouseDown, onSlotMouseEnter, onSlotTouchStart, onContextMenu, onNoteClick,
+}: WeekDayColumnProps) {
+  const daySlots = slotData[dk] || {}
+  const groupPositions = useMemo(() => computeSlotGroupPositions(daySlots), [daySlots])
+  const gcalVisible = useGoogleCalendarStore((s) => s.visible)
+  const gcalEvents = useGoogleCalendarStore((s) => s.eventsByDate[dk])
+  const gcalSlots = useMemo(
+    () => gcalVisible && gcalEvents ? mapEventsToSlots(gcalEvents, dk) : {},
+    [gcalVisible, gcalEvents, dk],
+  )
+
+  return (
+    <div className={`flex-1 ${isToday ? 'bg-accent/[0.03]' : ''}`}>
+      {SLOTS.map((slot) => (
+        <SlotCell
+          key={slot.key}
+          dk={dk}
+          slotKey={slot.key}
+          slotLabel={slot.label}
+          entry={daySlots[slot.key]}
+          googleEvent={gcalSlots[slot.key] ?? null}
+          isWeekView
+          isDragging={isDragging}
+          groupPosition={groupPositions[slot.key]}
+          onMouseDown={onSlotMouseDown}
+          onMouseEnter={onSlotMouseEnter}
+          onTouchStart={onSlotTouchStart}
+          onContextMenu={onContextMenu}
+          onNoteClick={onNoteClick}
+        />
+      ))}
     </div>
   )
 }

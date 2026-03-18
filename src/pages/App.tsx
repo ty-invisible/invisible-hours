@@ -10,6 +10,7 @@ import { ResizeHandle } from '../components/ui/ResizeHandle'
 import { ToastContainer } from '../components/ui/Toast'
 import { useUIStore, type MobileTab } from '../store/uiStore'
 import { useSupabaseSync } from '../hooks/useSupabaseSync'
+import { useGoogleCalendarSync } from '../hooks/useGoogleCalendarSync'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { useThemeSync } from '../hooks/useThemeSync'
 import { useIsMobile } from '../hooks/useIsMobile'
@@ -82,14 +83,33 @@ function AuthenticatedApp({ user }: { user: User }) {
   const setStatsWidth = useUIStore((s) => s.setStatsWidth)
   const focusMode = useUIStore((s) => s.focusMode)
   const mobileTab = useUIStore((s) => s.mobileTab)
+  const addToast = useUIStore((s) => s.addToast)
 
   const sync = useSupabaseSync(user)
+  const gcalSync = useGoogleCalendarSync(user)
   useKeyboardShortcuts()
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const code = params.get('code')
+    const state = params.get('state')
+    if (code && state === 'google-calendar') {
+      const redirectUri = `${window.location.origin}${window.location.pathname}`
+      window.history.replaceState({}, '', window.location.pathname)
+      gcalSync.linkGoogleCalendar(code, redirectUri).then((ok) => {
+        if (ok) {
+          addToast({ message: 'Google Calendar connected', type: 'success' })
+        } else {
+          addToast({ message: 'Failed to connect Google Calendar', type: 'error' })
+        }
+      })
+    }
+  }, [])
 
   if (isMobile) {
     return (
       <div className="h-full flex flex-col overflow-hidden">
-        <Header user={user} sync={sync} />
+        <Header user={user} sync={sync} gcalSync={gcalSync} />
         <div className="flex-1 min-h-0 overflow-hidden">
           {mobileTab === 'palette' && <PaletteColumn sync={sync} />}
           {mobileTab === 'calendar' && <CalendarColumn sync={sync} />}
@@ -103,7 +123,7 @@ function AuthenticatedApp({ user }: { user: User }) {
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      <Header user={user} sync={sync} />
+      <Header user={user} sync={sync} gcalSync={gcalSync} />
       <div className="flex flex-1 min-h-0">
         {!focusMode && (
           <>

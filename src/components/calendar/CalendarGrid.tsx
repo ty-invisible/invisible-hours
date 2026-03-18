@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { AnimatePresence } from 'motion/react'
 import { SLOTS, dateKey } from '../../lib/slots'
 import { useCalendarStore } from '../../store/calendarStore'
+import { useGoogleCalendarStore } from '../../store/googleCalendarStore'
+import { mapEventsToSlots } from '../../lib/googleCalendarSlots'
 import { SlotCell } from './SlotCell'
 import { NowLine } from './NowLine'
 import { NotePopup } from './NotePopup'
@@ -34,6 +36,13 @@ export function CalendarGrid({ onStrokeComplete, onSaveNote }: CalendarGridProps
   const dk = dateKey(currentDate)
   const daySlots = slotData[dk] || {}
   const groupPositions = useMemo(() => computeSlotGroupPositions(daySlots), [daySlots])
+
+  const gcalVisible = useGoogleCalendarStore((s) => s.visible)
+  const gcalEvents = useGoogleCalendarStore((s) => s.eventsByDate[dk])
+  const gcalSlots = useMemo(
+    () => gcalVisible && gcalEvents ? mapEventsToSlots(gcalEvents, dk) : {},
+    [gcalVisible, gcalEvents, dk],
+  )
 
   const isToday = dk === dateKey(new Date())
 
@@ -110,6 +119,7 @@ export function CalendarGrid({ onStrokeComplete, onSaveNote }: CalendarGridProps
                 slotKey={slot.key}
                 slotLabel={slot.label}
                 entry={daySlots[slot.key]}
+                googleEvent={gcalSlots[slot.key] ?? null}
                 isDragging={isDragging}
                 groupPosition={groupPositions[slot.key]}
                 onMouseDown={onSlotMouseDown}

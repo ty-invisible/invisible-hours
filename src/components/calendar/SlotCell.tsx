@@ -2,6 +2,7 @@ import { memo, useRef, useCallback, useMemo } from 'react'
 import { contrastColor, lighten } from '../../lib/categories'
 import { useCategoryStore } from '../../store/categoryStore'
 import { useCalendarStore, type SlotEntry } from '../../store/calendarStore'
+import type { GoogleCalendarSlotInfo } from '../../store/googleCalendarStore'
 
 const CROSS_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Cline x1='4' y1='4' x2='16' y2='16' stroke='white' stroke-width='4' stroke-linecap='round'/%3E%3Cline x1='16' y1='4' x2='4' y2='16' stroke='white' stroke-width='4' stroke-linecap='round'/%3E%3Cline x1='4' y1='4' x2='16' y2='16' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3Cline x1='16' y1='4' x2='4' y2='16' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 10 10, crosshair`
 
@@ -16,6 +17,7 @@ interface SlotCellProps {
   slotKey: string
   slotLabel: string
   entry: SlotEntry | undefined
+  googleEvent?: GoogleCalendarSlotInfo | null
   isWeekView?: boolean
   isDragging?: boolean
   groupPosition?: SlotGroupPosition
@@ -34,7 +36,7 @@ const GROUP_RADIUS: Record<SlotGroupPosition, string> = {
 }
 
 export const SlotCell = memo(function SlotCell({
-  dk, slotKey, entry, isWeekView, isDragging, groupPosition,
+  dk, slotKey, entry, googleEvent, isWeekView, isDragging, groupPosition,
   onMouseDown, onMouseEnter, onTouchStart, onContextMenu, onNoteClick,
 }: SlotCellProps) {
   const activeCategoryId = useCategoryStore((s) => s.activeCategoryId)
@@ -152,10 +154,29 @@ export const SlotCell = memo(function SlotCell({
             )}
           </div>
         ) : showPreview ? (
-          <div
-            className="absolute inset-0 opacity-0 group-hover:opacity-[0.31] transition-opacity rounded-lg"
-            style={{ backgroundColor: previewColor }}
-          />
+          <>
+            <div
+              className="absolute inset-0 opacity-0 group-hover:opacity-[0.31] transition-opacity rounded-lg"
+              style={{ backgroundColor: previewColor }}
+            />
+            {googleEvent && (
+              <div className={`absolute inset-0 flex items-center px-2 pointer-events-none bg-muted/15 ${googleEvent.isFirstSlot && googleEvent.isLastSlot ? 'rounded-lg' : googleEvent.isFirstSlot ? 'rounded-t-lg' : googleEvent.isLastSlot ? 'rounded-b-lg' : ''}`}>
+                {googleEvent.isFirstSlot && (
+                  <span className={`${isWeekView ? 'text-[9px]' : 'text-[11px]'} text-muted/80 truncate`}>
+                    {googleEvent.summary}
+                  </span>
+                )}
+              </div>
+            )}
+          </>
+        ) : googleEvent ? (
+          <div className={`absolute inset-0 flex items-center px-2 pointer-events-none bg-muted/15 ${googleEvent.isFirstSlot && googleEvent.isLastSlot ? 'rounded-lg' : googleEvent.isFirstSlot ? 'rounded-t-lg' : googleEvent.isLastSlot ? 'rounded-b-lg' : ''}`}>
+            {googleEvent.isFirstSlot && (
+              <span className={`${isWeekView ? 'text-[9px]' : 'text-[11px]'} text-muted/80 truncate`}>
+                {googleEvent.summary}
+              </span>
+            )}
+          </div>
         ) : (
           <div
             className="absolute inset-0 opacity-0 group-hover:opacity-[0.04] transition-opacity bg-current rounded-lg"

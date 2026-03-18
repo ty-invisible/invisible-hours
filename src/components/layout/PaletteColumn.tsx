@@ -1,10 +1,11 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useCategoryStore } from '../../store/categoryStore'
+import { useGoogleCalendarStore } from '../../store/googleCalendarStore'
 import { CategoryRow } from '../palette/CategoryRow'
 import { MoreAccordion } from '../palette/MoreAccordion'
 import { EraserButton } from '../palette/EraserButton'
 import { CategoryEditor } from '../palette/CategoryEditor'
-import { PlusIcon } from '../ui/Icons'
+import { PlusIcon, EyeIcon, EyeOffIcon } from '../ui/Icons'
 
 const MAX_VISIBLE = 10
 
@@ -146,6 +147,7 @@ export function PaletteColumn({ sync }: PaletteColumnProps) {
           <PlusIcon size={18} />
           Add
         </button>
+        <GcalVisibilityToggle />
       </div>
 
       {showNewEditor && (
@@ -157,5 +159,23 @@ export function PaletteColumn({ sync }: PaletteColumnProps) {
         />
       )}
     </div>
+  )
+}
+
+function GcalVisibilityToggle() {
+  const linked = useGoogleCalendarStore((s) => s.linked)
+  const visible = useGoogleCalendarStore((s) => s.visible)
+  const toggleVisible = useGoogleCalendarStore((s) => s.toggleVisible)
+
+  if (!linked) return null
+
+  return (
+    <button
+      onClick={toggleVisible}
+      className="flex-1 h-14 flex flex-col items-center justify-center gap-1 rounded-lg text-xs bg-bg text-muted hover:text-text transition-colors"
+    >
+      {visible ? <EyeIcon size={18} /> : <EyeOffIcon size={18} />}
+      Calendar
+    </button>
   )
 }
