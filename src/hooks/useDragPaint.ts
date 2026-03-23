@@ -3,9 +3,8 @@ import { useCalendarStore, type SlotData, type SlotEntry } from '../store/calend
 import { useCategoryStore } from '../store/categoryStore'
 import { SLOT_INDEX, SLOTS } from '../lib/slots'
 
-type TouchPhase = 'idle' | 'pending' | 'painting' | 'scrolling'
+type TouchPhase = 'idle' | 'pending' | 'scrolling'
 
-const LONG_PRESS_MS = 300
 const MOVE_THRESHOLD = 10
 
 interface DragPaintResult {
@@ -22,17 +21,6 @@ function slotKeyFromIndex(i: number): string {
   return SLOTS[i].key
 }
 
-function resolveSlotFromPoint(x: number, y: number): { dk: string; slotKey: string } | null {
-  const el = document.elementFromPoint(x, y)
-  if (!el) return null
-  const slotEl = (el as HTMLElement).closest('[data-dk][data-slot-key]') as HTMLElement | null
-  if (!slotEl) return null
-  const dk = slotEl.dataset.dk
-  const slotKey = slotEl.dataset.slotKey
-  if (!dk || !slotKey) return null
-  return { dk, slotKey }
-}
-
 export function useDragPaint(onStrokeComplete?: (dk: string, changes: Record<string, SlotEntry | null>) => void): DragPaintResult {
   const isDragging = useRef(false)
   const [isDraggingState, setIsDraggingState] = useState(false)
@@ -44,9 +32,7 @@ export function useDragPaint(onStrokeComplete?: (dk: string, changes: Record<str
   const dragStroke = useRef<Set<string>>(new Set())
   const strokeChanges = useRef<Record<string, SlotEntry | null>>({})
 
-  // Touch long-press state
   const touchPhase = useRef<TouchPhase>('idle')
-  const longPressTimer = useRef<number | null>(null)
   const touchStartSlot = useRef<{ dk: string; slotKey: string } | null>(null)
   const touchStartPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
 
@@ -162,14 +148,7 @@ export function useDragPaint(onStrokeComplete?: (dk: string, changes: Record<str
     }
   }, [onStrokeComplete])
 
-  const clearLongPressTimer = useCallback(() => {
-    if (longPressTimer.current !== null) {
-      window.clearTimeout(longPressTimer.current)
-      longPressTimer.current = null
-    }
-  }, [])
-
-  // --- Mouse handlers (unchanged) ---
+  // --- Mouse handlers ---
 
   const onSlotMouseDown = useCallback((dk: string, slotKey: string, e: React.MouseEvent) => {
     e.preventDefault()
@@ -184,63 +163,36 @@ export function useDragPaint(onStrokeComplete?: (dk: string, changes: Record<str
     endStroke()
   }, [endStroke])
 
-  // --- Touch handlers (long-press state machine) ---
+  // --- Touch handlers (tap-only on mobile, no drag painting) ---
 
-  const onSlotTouchStart = useCallback((dk: string, slotKey: string, touchX: number, touchY: number) => {
-    clearLongPressTimer()
+  const onSlotTouchStart = useCallback((dk: string, slotKey: string, _touchX: number, _touchY: number) => {
     touchPhase.current = 'pending'
     touchStartSlot.current = { dk, slotKey }
-    touchStartPos.current = { x: touchX, y: touchY }
-
-    longPressTimer.current = window.setTimeout(() => {
-      longPressTimer.current = null
-      if (touchPhase.current !== 'pending') return
-      touchPhase.current = 'painting'
-      beginStroke(dk, slotKey)
-    }, LONG_PRESS_MS)
-  }, [beginStroke, clearLongPressTimer])
+    touchStartPos.current = { x: _touchX, y: _touchY }
+  }, [])
 
   const handleNativeTouchMove = useCallback((e: TouchEvent) => {
-    const phase = touchPhase.current
-    if (phase === 'idle' || phase === 'scrolling') return
-
+    if (touchPhase.current !== 'pending') return
     const touch = e.touches[0]
-
-    if (phase === 'pending') {
-      const dx = touch.clientX - touchStartPos.current.x
-      const dy = touch.clientY - touchStartPos.current.y
-      if (Math.sqrt(dx * dx + dy * dy) > MOVE_THRESHOLD) {
-        touchPhase.current = 'scrolling'
-        clearLongPressTimer()
-      }
-      return
+    const dx = touch.clientX - touchStartPos.current.x
+    const dy = touch.clientY - touchStartPos.current.y
+    if (Math.sqrt(dx * dx + dy * dy) > MOVE_THRESHOLD) {
+      touchPhase.current = 'scrolling'
     }
-
-    // phase === 'painting'
-    e.preventDefault()
-    const hit = resolveSlotFromPoint(touch.clientX, touch.clientY)
-    if (hit) {
-      enterSlot(hit.dk, hit.slotKey)
-    }
-  }, [enterSlot, clearLongPressTimer])
+  }, [])
 
   const handleNativeTouchEnd = useCallback(() => {
     const phase = touchPhase.current
     const slot = touchStartSlot.current
 
-    clearLongPressTimer()
     touchPhase.current = 'idle'
     touchStartSlot.current = null
 
     if (phase === 'pending' && slot) {
-      // Quick tap — paint single slot
       beginStroke(slot.dk, slot.slotKey)
       endStroke()
-    } else if (phase === 'painting') {
-      endStroke()
     }
-    // phase === 'scrolling' or 'idle' — do nothing
-  }, [beginStroke, endStroke, clearLongPressTimer])
+  }, [beginStroke, endStroke])
 
   return {
     onSlotMouseDown,
