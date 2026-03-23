@@ -12,8 +12,10 @@ interface DragPaintResult {
   onSlotMouseEnter: (dk: string, slotKey: string) => void
   onMouseUp: () => void
   onSlotTouchStart: (dk: string, slotKey: string, touchX: number, touchY: number) => void
+  /** Call from the same slot that received touchstart (React onTouchEnd) — required on iOS where parent touchend is unreliable */
+  onSlotTouchEnd: (dk: string, slotKey: string) => void
+  onSlotTouchCancel: () => void
   handleNativeTouchMove: (e: TouchEvent) => void
-  handleNativeTouchEnd: () => void
   isDragging: boolean
 }
 
@@ -174,6 +176,7 @@ export function useDragPaint(onStrokeComplete?: (dk: string, changes: Record<str
   const handleNativeTouchMove = useCallback((e: TouchEvent) => {
     if (touchPhase.current !== 'pending') return
     const touch = e.touches[0]
+    if (!touch) return
     const dx = touch.clientX - touchStartPos.current.x
     const dy = touch.clientY - touchStartPos.current.y
     if (Math.sqrt(dx * dx + dy * dy) > MOVE_THRESHOLD) {
@@ -181,26 +184,36 @@ export function useDragPaint(onStrokeComplete?: (dk: string, changes: Record<str
     }
   }, [])
 
-  const handleNativeTouchEnd = useCallback(() => {
-    const phase = touchPhase.current
-    const slot = touchStartSlot.current
+  const onSlotTouchEnd = useCallback(
+    (dk: string, slotKey: string) => {
+      const slot = touchStartSlot.current
+      if (!slot || slot.dk !== dk || slot.slotKey !== slotKey) return
 
+      const phase = touchPhase.current
+      touchPhase.current = 'idle'
+      touchStartSlot.current = null
+
+      if (phase !== 'pending') return
+
+      beginStroke(dk, slotKey)
+      endStroke()
+    },
+    [beginStroke, endStroke],
+  )
+
+  const onSlotTouchCancel = useCallback(() => {
     touchPhase.current = 'idle'
     touchStartSlot.current = null
-
-    if (phase === 'pending' && slot) {
-      beginStroke(slot.dk, slot.slotKey)
-      endStroke()
-    }
-  }, [beginStroke, endStroke])
+  }, [])
 
   return {
     onSlotMouseDown,
     onSlotMouseEnter,
     onMouseUp,
     onSlotTouchStart,
+    onSlotTouchEnd,
+    onSlotTouchCancel,
     handleNativeTouchMove,
-    handleNativeTouchEnd,
     isDragging: isDraggingState,
   }
 }

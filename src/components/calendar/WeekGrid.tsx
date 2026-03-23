@@ -43,7 +43,16 @@ export function WeekGrid({ onStrokeComplete, onSaveNote }: WeekGridProps) {
   }, [allWeekDates, showWeekends])
   const todayDk = dateKey(new Date())
 
-  const { onSlotMouseDown, onSlotMouseEnter, onMouseUp, onSlotTouchStart, handleNativeTouchMove, handleNativeTouchEnd, isDragging } = useDragPaint(onStrokeComplete)
+  const {
+    onSlotMouseDown,
+    onSlotMouseEnter,
+    onMouseUp,
+    onSlotTouchStart,
+    onSlotTouchEnd,
+    onSlotTouchCancel,
+    handleNativeTouchMove,
+    isDragging,
+  } = useDragPaint(onStrokeComplete)
 
   const [notePopup, setNotePopup] = useState<{
     dk: string; slotKey: string; position: { x: number; y: number }
@@ -65,13 +74,11 @@ export function WeekGrid({ onStrokeComplete, onSaveNote }: WeekGridProps) {
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
-    el.addEventListener('touchmove', handleNativeTouchMove, { passive: false })
-    el.addEventListener('touchend', handleNativeTouchEnd)
+    el.addEventListener('touchmove', handleNativeTouchMove, { passive: false, capture: true })
     return () => {
-      el.removeEventListener('touchmove', handleNativeTouchMove)
-      el.removeEventListener('touchend', handleNativeTouchEnd)
+      el.removeEventListener('touchmove', handleNativeTouchMove, true)
     }
-  }, [handleNativeTouchMove, handleNativeTouchEnd])
+  }, [handleNativeTouchMove])
 
   const handleContextMenu = useCallback((_e: React.MouseEvent, dk: string, slotKey: string) => {
     setFocusedSlot({ dateKey: dk, slotKey })
@@ -142,6 +149,8 @@ export function WeekGrid({ onStrokeComplete, onSaveNote }: WeekGridProps) {
                   onSlotMouseDown={onSlotMouseDown}
                   onSlotMouseEnter={onSlotMouseEnter}
                   onSlotTouchStart={onSlotTouchStart}
+                  onSlotTouchEnd={onSlotTouchEnd}
+                  onSlotTouchCancel={onSlotTouchCancel}
                   onContextMenu={handleContextMenu}
                   onNoteClick={handleNoteClick}
                 />
@@ -175,13 +184,16 @@ interface WeekDayColumnProps {
   onSlotMouseDown: (dk: string, slotKey: string, e: React.MouseEvent) => void
   onSlotMouseEnter: (dk: string, slotKey: string) => void
   onSlotTouchStart: (dk: string, slotKey: string, x: number, y: number) => void
+  onSlotTouchEnd: (dk: string, slotKey: string) => void
+  onSlotTouchCancel: () => void
   onContextMenu: (e: React.MouseEvent, dk: string, slotKey: string) => void
   onNoteClick: (e: React.MouseEvent, dk: string, slotKey: string) => void
 }
 
 function WeekDayColumn({
   dk, isToday, slotData, isDragging,
-  onSlotMouseDown, onSlotMouseEnter, onSlotTouchStart, onContextMenu, onNoteClick,
+  onSlotMouseDown, onSlotMouseEnter, onSlotTouchStart, onSlotTouchEnd, onSlotTouchCancel,
+  onContextMenu, onNoteClick,
 }: WeekDayColumnProps) {
   const daySlots = slotData[dk] || {}
   const groupPositions = useMemo(() => computeSlotGroupPositions(daySlots), [daySlots])
@@ -208,6 +220,8 @@ function WeekDayColumn({
           onMouseDown={onSlotMouseDown}
           onMouseEnter={onSlotMouseEnter}
           onTouchStart={onSlotTouchStart}
+          onTouchEnd={onSlotTouchEnd}
+          onTouchCancel={onSlotTouchCancel}
           onContextMenu={onContextMenu}
           onNoteClick={onNoteClick}
         />

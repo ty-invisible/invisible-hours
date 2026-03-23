@@ -46,7 +46,16 @@ export function CalendarGrid({ onStrokeComplete, onSaveNote }: CalendarGridProps
 
   const isToday = dk === dateKey(new Date())
 
-  const { onSlotMouseDown, onSlotMouseEnter, onMouseUp, onSlotTouchStart, handleNativeTouchMove, handleNativeTouchEnd, isDragging } = useDragPaint(onStrokeComplete)
+  const {
+    onSlotMouseDown,
+    onSlotMouseEnter,
+    onMouseUp,
+    onSlotTouchStart,
+    onSlotTouchEnd,
+    onSlotTouchCancel,
+    handleNativeTouchMove,
+    isDragging,
+  } = useDragPaint(onStrokeComplete)
 
   const [notePopup, setNotePopup] = useState<{
     dk: string; slotKey: string; position: { x: number; y: number }
@@ -68,13 +77,11 @@ export function CalendarGrid({ onStrokeComplete, onSaveNote }: CalendarGridProps
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
-    el.addEventListener('touchmove', handleNativeTouchMove, { passive: false })
-    el.addEventListener('touchend', handleNativeTouchEnd)
+    el.addEventListener('touchmove', handleNativeTouchMove, { passive: false, capture: true })
     return () => {
-      el.removeEventListener('touchmove', handleNativeTouchMove)
-      el.removeEventListener('touchend', handleNativeTouchEnd)
+      el.removeEventListener('touchmove', handleNativeTouchMove, true)
     }
-  }, [handleNativeTouchMove, handleNativeTouchEnd])
+  }, [handleNativeTouchMove])
 
   const handleContextMenu = useCallback((_e: React.MouseEvent, dk: string, slotKey: string) => {
     setFocusedSlot({ dateKey: dk, slotKey })
@@ -125,6 +132,8 @@ export function CalendarGrid({ onStrokeComplete, onSaveNote }: CalendarGridProps
                 onMouseDown={onSlotMouseDown}
                 onMouseEnter={onSlotMouseEnter}
                 onTouchStart={onSlotTouchStart}
+                onTouchEnd={onSlotTouchEnd}
+                onTouchCancel={onSlotTouchCancel}
                 onContextMenu={handleContextMenu}
                 onNoteClick={handleNoteClick}
               />

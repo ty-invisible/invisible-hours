@@ -24,6 +24,8 @@ interface SlotCellProps {
   onMouseDown: (dk: string, slotKey: string, e: React.MouseEvent) => void
   onMouseEnter: (dk: string, slotKey: string) => void
   onTouchStart?: (dk: string, slotKey: string, x: number, y: number) => void
+  onTouchEnd?: (dk: string, slotKey: string) => void
+  onTouchCancel?: () => void
   onContextMenu: (e: React.MouseEvent, dk: string, slotKey: string) => void
   onNoteClick: (e: React.MouseEvent, dk: string, slotKey: string) => void
 }
@@ -37,7 +39,7 @@ const GROUP_RADIUS: Record<SlotGroupPosition, string> = {
 
 export const SlotCell = memo(function SlotCell({
   dk, slotKey, entry, googleEvent, isWeekView, isDragging, groupPosition,
-  onMouseDown, onMouseEnter, onTouchStart, onContextMenu, onNoteClick,
+  onMouseDown, onMouseEnter, onTouchStart, onTouchEnd, onTouchCancel, onContextMenu, onNoteClick,
 }: SlotCellProps) {
   const activeCategoryId = useCategoryStore((s) => s.activeCategoryId)
   const eraserOn = useCategoryStore((s) => s.eraserOn)
@@ -108,6 +110,14 @@ export const SlotCell = memo(function SlotCell({
         if (!activeCategoryId && !eraserOn) return
         const t = e.touches[0]
         onTouchStart?.(dk, slotKey, t.clientX, t.clientY)
+      }}
+      onTouchEnd={() => {
+        if (!activeCategoryId && !eraserOn) return
+        onTouchEnd?.(dk, slotKey)
+      }}
+      onTouchCancel={() => {
+        if (!activeCategoryId && !eraserOn) return
+        onTouchCancel?.()
       }}
       onContextMenu={(e) => {
         e.preventDefault()
