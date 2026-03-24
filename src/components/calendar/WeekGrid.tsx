@@ -183,7 +183,7 @@ interface WeekDayColumnProps {
   isDragging: boolean
   onSlotMouseDown: (dk: string, slotKey: string, e: React.MouseEvent) => void
   onSlotMouseEnter: (dk: string, slotKey: string) => void
-  onSlotTouchStart: (dk: string, slotKey: string, x: number, y: number) => void
+  onSlotTouchStart: (dk: string, slotKey: string, x: number, y: number, touchId: number) => void
   onSlotTouchEnd: (dk: string, slotKey: string) => void
   onSlotTouchCancel: () => void
   onContextMenu: (e: React.MouseEvent, dk: string, slotKey: string) => void

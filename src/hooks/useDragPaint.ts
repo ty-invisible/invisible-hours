@@ -1,17 +1,21 @@
-import { useRef, useCallback, useState } from 'react'
+import { useRef, useCallback, useState, useEffect } from 'react'
 import { useCalendarStore, type SlotData, type SlotEntry } from '../store/calendarStore'
 import { useCategoryStore } from '../store/categoryStore'
 import { SLOT_INDEX, SLOTS } from '../lib/slots'
 
-/** Ignore tap-to-paint if the finger moved farther than this (px) from touchstart — avoids scroll jitter canceling taps. */
-const TAP_CANCEL_MOVEMENT_PX = 32
+/**
+ * Commit tap-to-paint only if the finger stays within this radius (px) of touchstart.
+ * Larger motion = scroll / drag intent, not a tap.
+ */
+const TAP_MAX_MOVEMENT_PX = 14
 
 interface DragPaintResult {
   onSlotMouseDown: (dk: string, slotKey: string, e: React.MouseEvent) => void
   onSlotMouseEnter: (dk: string, slotKey: string) => void
   onMouseUp: () => void
-  onSlotTouchStart: (dk: string, slotKey: string, touchX: number, touchY: number) => void
-  /** Call from the same slot that received touchstart (React onTouchEnd) — required on iOS where parent touchend is unreliable */
+  /** `touchId` must be `Touch.identifier` from the same touchstart event (used for global touchend matching). */
+  onSlotTouchStart: (dk: string, slotKey: string, touchX: number, touchY: number, touchId: number) => void
+  /** Unused: tap completion runs on window `touchend` (see onSlotTouchStart). Kept so callers can omit wiring. */
   onSlotTouchEnd: (dk: string, slotKey: string) => void
   onSlotTouchCancel: () => void
   handleNativeTouchMove: (e: TouchEvent) => void
@@ -36,6 +40,24 @@ export function useDragPaint(onStrokeComplete?: (dk: string, changes: Record<str
   const touchStartSlot = useRef<{ dk: string; slotKey: string } | null>(null)
   const touchStartPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
   const touchMaxMove = useRef(0)
+  const activeTouchId = useRef<number | null>(null)
+  const removeGlobalTouchListeners = useRef<(() => void) | null>(null)
+  /** After a touch tap paints, iOS may emit a synthetic mouse sequence — ignore mousedown briefly. */
+  const ignoreMouseDownUntil = useRef(0)
+
+  const detachGlobalTouchListeners = useCallback(() => {
+    removeGlobalTouchListeners.current?.()
+    removeGlobalTouchListeners.current = null
+  }, [])
+
+  useEffect(
+    () => () => {
+      detachGlobalTouchListeners()
+      activeTouchId.current = null
+      touchStartSlot.current = null
+    },
+    [detachGlobalTouchListeners],
+  )
 
   const paintSlot = useCallback((dk: string, slotKey: string) => {
     const { setSlot } = useCalendarStore.getState()
@@ -149,9 +171,15 @@ export function useDragPaint(onStrokeComplete?: (dk: string, changes: Record<str
     }
   }, [onStrokeComplete])
 
+  const beginStrokeRef = useRef(beginStroke)
+  beginStrokeRef.current = beginStroke
+  const endStrokeRef = useRef(endStroke)
+  endStrokeRef.current = endStroke
+
   // --- Mouse handlers ---
 
   const onSlotMouseDown = useCallback((dk: string, slotKey: string, e: React.MouseEvent) => {
+    if (Date.now() < ignoreMouseDownUntil.current) return
     e.preventDefault()
     beginStroke(dk, slotKey)
   }, [beginStroke])
@@ -164,47 +192,77 @@ export function useDragPaint(onStrokeComplete?: (dk: string, changes: Record<str
     endStroke()
   }, [endStroke])
 
-  // --- Touch handlers (tap-only on mobile, no drag painting) ---
+  // --- Touch: tap-only via window touchend (slot-level touchend is unreliable on iOS) ---
 
-  const onSlotTouchStart = useCallback((dk: string, slotKey: string, _touchX: number, _touchY: number) => {
-    touchStartSlot.current = { dk, slotKey }
-    touchStartPos.current = { x: _touchX, y: _touchY }
-    touchMaxMove.current = 0
-  }, [])
+  const onSlotTouchStart = useCallback(
+    (dk: string, slotKey: string, touchX: number, touchY: number, touchId: number) => {
+      detachGlobalTouchListeners()
+
+      touchStartSlot.current = { dk, slotKey }
+      touchStartPos.current = { x: touchX, y: touchY }
+      touchMaxMove.current = 0
+      activeTouchId.current = touchId
+
+      const onGlobalTouchEnd = (e: TouchEvent) => {
+        if (activeTouchId.current === null) return
+        let ours = false
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          if (e.changedTouches[i].identifier === activeTouchId.current) {
+            ours = true
+            break
+          }
+        }
+        if (!ours) return
+
+        const slot = touchStartSlot.current
+        const maxMove = touchMaxMove.current
+
+        detachGlobalTouchListeners()
+        activeTouchId.current = null
+        touchStartSlot.current = null
+
+        if (e.type === 'touchcancel') return
+        if (!slot) return
+        if (maxMove > TAP_MAX_MOVEMENT_PX) return
+
+        beginStrokeRef.current(slot.dk, slot.slotKey)
+        endStrokeRef.current()
+        ignoreMouseDownUntil.current = Date.now() + 450
+      }
+
+      window.addEventListener('touchend', onGlobalTouchEnd, true)
+      window.addEventListener('touchcancel', onGlobalTouchEnd, true)
+      removeGlobalTouchListeners.current = () => {
+        window.removeEventListener('touchend', onGlobalTouchEnd, true)
+        window.removeEventListener('touchcancel', onGlobalTouchEnd, true)
+      }
+    },
+    [detachGlobalTouchListeners],
+  )
 
   const handleNativeTouchMove = useCallback((e: TouchEvent) => {
-    if (!touchStartSlot.current) return
-    const touch = e.touches[0]
-    if (!touch) return
-    const dx = touch.clientX - touchStartPos.current.x
-    const dy = touch.clientY - touchStartPos.current.y
+    if (!touchStartSlot.current || activeTouchId.current === null) return
+    let t: Touch | undefined
+    for (let i = 0; i < e.touches.length; i++) {
+      if (e.touches[i].identifier === activeTouchId.current) {
+        t = e.touches[i]
+        break
+      }
+    }
+    if (!t) return
+    const dx = t.clientX - touchStartPos.current.x
+    const dy = t.clientY - touchStartPos.current.y
     const d = Math.hypot(dx, dy)
     if (d > touchMaxMove.current) touchMaxMove.current = d
   }, [])
 
-  const onSlotTouchEnd = useCallback(
-    (dk: string, slotKey: string) => {
-      const slot = touchStartSlot.current
-      if (!slot) return
-      if (slot.dk !== dk || slot.slotKey !== slotKey) {
-        touchStartSlot.current = null
-        return
-      }
-
-      touchStartSlot.current = null
-      const maxMove = touchMaxMove.current
-
-      if (maxMove > TAP_CANCEL_MOVEMENT_PX) return
-
-      beginStroke(dk, slotKey)
-      endStroke()
-    },
-    [beginStroke, endStroke],
-  )
+  const onSlotTouchEnd = useCallback((_dk: string, _slotKey: string) => {}, [])
 
   const onSlotTouchCancel = useCallback(() => {
+    detachGlobalTouchListeners()
+    activeTouchId.current = null
     touchStartSlot.current = null
-  }, [])
+  }, [detachGlobalTouchListeners])
 
   return {
     onSlotMouseDown,

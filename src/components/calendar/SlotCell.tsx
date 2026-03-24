@@ -23,7 +23,7 @@ interface SlotCellProps {
   groupPosition?: SlotGroupPosition
   onMouseDown: (dk: string, slotKey: string, e: React.MouseEvent) => void
   onMouseEnter: (dk: string, slotKey: string) => void
-  onTouchStart?: (dk: string, slotKey: string, x: number, y: number) => void
+  onTouchStart?: (dk: string, slotKey: string, x: number, y: number, touchId: number) => void
   onTouchEnd?: (dk: string, slotKey: string) => void
   onTouchCancel?: () => void
   onContextMenu: (e: React.MouseEvent, dk: string, slotKey: string) => void
@@ -109,7 +109,7 @@ export const SlotCell = memo(function SlotCell({
       onTouchStart={(e) => {
         if (!activeCategoryId && !eraserOn) return
         const t = e.touches[0]
-        onTouchStart?.(dk, slotKey, t.clientX, t.clientY)
+        onTouchStart?.(dk, slotKey, t.clientX, t.clientY, t.identifier)
       }}
       onTouchEnd={() => {
         if (!activeCategoryId && !eraserOn) return
