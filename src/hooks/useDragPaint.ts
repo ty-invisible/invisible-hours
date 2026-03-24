@@ -3,9 +3,8 @@ import { useCalendarStore, type SlotData, type SlotEntry } from '../store/calend
 import { useCategoryStore } from '../store/categoryStore'
 import { SLOT_INDEX, SLOTS } from '../lib/slots'
 
-type TouchPhase = 'idle' | 'pending' | 'scrolling'
-
-const MOVE_THRESHOLD = 10
+/** Ignore tap-to-paint if the finger moved farther than this (px) from touchstart — avoids scroll jitter canceling taps. */
+const TAP_CANCEL_MOVEMENT_PX = 32
 
 interface DragPaintResult {
   onSlotMouseDown: (dk: string, slotKey: string, e: React.MouseEvent) => void
@@ -34,9 +33,9 @@ export function useDragPaint(onStrokeComplete?: (dk: string, changes: Record<str
   const dragStroke = useRef<Set<string>>(new Set())
   const strokeChanges = useRef<Record<string, SlotEntry | null>>({})
 
-  const touchPhase = useRef<TouchPhase>('idle')
   const touchStartSlot = useRef<{ dk: string; slotKey: string } | null>(null)
   const touchStartPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
+  const touchMaxMove = useRef(0)
 
   const paintSlot = useCallback((dk: string, slotKey: string) => {
     const { setSlot } = useCalendarStore.getState()
@@ -168,32 +167,34 @@ export function useDragPaint(onStrokeComplete?: (dk: string, changes: Record<str
   // --- Touch handlers (tap-only on mobile, no drag painting) ---
 
   const onSlotTouchStart = useCallback((dk: string, slotKey: string, _touchX: number, _touchY: number) => {
-    touchPhase.current = 'pending'
     touchStartSlot.current = { dk, slotKey }
     touchStartPos.current = { x: _touchX, y: _touchY }
+    touchMaxMove.current = 0
   }, [])
 
   const handleNativeTouchMove = useCallback((e: TouchEvent) => {
-    if (touchPhase.current !== 'pending') return
+    if (!touchStartSlot.current) return
     const touch = e.touches[0]
     if (!touch) return
     const dx = touch.clientX - touchStartPos.current.x
     const dy = touch.clientY - touchStartPos.current.y
-    if (Math.sqrt(dx * dx + dy * dy) > MOVE_THRESHOLD) {
-      touchPhase.current = 'scrolling'
-    }
+    const d = Math.hypot(dx, dy)
+    if (d > touchMaxMove.current) touchMaxMove.current = d
   }, [])
 
   const onSlotTouchEnd = useCallback(
     (dk: string, slotKey: string) => {
       const slot = touchStartSlot.current
-      if (!slot || slot.dk !== dk || slot.slotKey !== slotKey) return
+      if (!slot) return
+      if (slot.dk !== dk || slot.slotKey !== slotKey) {
+        touchStartSlot.current = null
+        return
+      }
 
-      const phase = touchPhase.current
-      touchPhase.current = 'idle'
       touchStartSlot.current = null
+      const maxMove = touchMaxMove.current
 
-      if (phase !== 'pending') return
+      if (maxMove > TAP_CANCEL_MOVEMENT_PX) return
 
       beginStroke(dk, slotKey)
       endStroke()
@@ -202,7 +203,6 @@ export function useDragPaint(onStrokeComplete?: (dk: string, changes: Record<str
   )
 
   const onSlotTouchCancel = useCallback(() => {
-    touchPhase.current = 'idle'
     touchStartSlot.current = null
   }, [])
 
