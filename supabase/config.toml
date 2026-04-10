@@ -1,0 +1,6 @@
+# Per-function settings. See: https://supabase.com/docs/guides/functions/function-configuration
+#
+# The platform JWT gate was returning 401 "Invalid JWT" before our handler ran.
+# We still authenticate inside the function with createClient(...).auth.getUser(token).
+[functions.admin-api]
+verify_jwt = false

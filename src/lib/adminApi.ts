@@ -24,7 +24,18 @@ async function authHeaders(): Promise<HeadersInit> {
 
 export async function fetchAdminSelf(): Promise<boolean> {
   const { data: { session } } = await supabase.auth.getSession()
-  if (!session) return false
+  if (!session) {
+    if (import.meta.env.DEV) {
+      console.warn('[admin] No session — sign in again.')
+    }
+    return false
+  }
+  if (!SUPABASE_URL || !ANON) {
+    if (import.meta.env.DEV) {
+      console.warn('[admin] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY in .env')
+    }
+    return false
+  }
   const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-api?action=self`, {
     method: 'GET',
     headers: {
@@ -32,7 +43,19 @@ export async function fetchAdminSelf(): Promise<boolean> {
       apikey: ANON,
     },
   })
-  if (!res.ok) return false
+  if (!res.ok) {
+    if (import.meta.env.DEV) {
+      const text = await res.text()
+      let detail: unknown = text
+      try {
+        detail = JSON.parse(text) as unknown
+      } catch {
+        /* keep raw */
+      }
+      console.warn('[admin] admin-api?action=self failed:', res.status, detail)
+    }
+    return false
+  }
   const j = (await res.json()) as { isAdmin?: boolean }
   return !!j.isAdmin
 }
