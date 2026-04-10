@@ -22,6 +22,10 @@ async function authHeaders(): Promise<HeadersInit> {
   }
 }
 
+/**
+ * Whether the signed-in user is an admin. Uses `public.profiles.is_admin` via the
+ * normal Supabase client (RLS) — no Edge Function, so no JWT verification at the gateway.
+ */
 export async function fetchAdminSelf(): Promise<boolean> {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) {
@@ -30,34 +34,38 @@ export async function fetchAdminSelf(): Promise<boolean> {
     }
     return false
   }
-  if (!SUPABASE_URL || !ANON) {
+
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', session.user.id)
+    .maybeSingle()
+
+  if (error) {
     if (import.meta.env.DEV) {
-      console.warn('[admin] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY in .env')
+      console.warn('[admin] Could not read profiles:', error.message)
     }
     return false
   }
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-api?action=self`, {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-      apikey: ANON,
-    },
-  })
-  if (!res.ok) {
-    if (import.meta.env.DEV) {
-      const text = await res.text()
-      let detail: unknown = text
-      try {
-        detail = JSON.parse(text) as unknown
-      } catch {
-        /* keep raw */
-      }
-      console.warn('[admin] admin-api?action=self failed:', res.status, detail)
-    }
-    return false
+
+  return !!profile?.is_admin
+}
+
+async function adminApiError(res: Response): Promise<Error> {
+  const raw = await res.text()
+  let msg = res.statusText
+  try {
+    const j = JSON.parse(raw) as { error?: string; message?: string }
+    msg = j.error || j.message || msg
+  } catch {
+    if (raw) msg = raw
   }
-  const j = (await res.json()) as { isAdmin?: boolean }
-  return !!j.isAdmin
+  if (res.status === 401) {
+    return new Error(
+      `${msg} — Redeploy the Edge Function with JWT verification off: supabase functions deploy admin-api --no-verify-jwt`,
+    )
+  }
+  return new Error(msg)
 }
 
 export async function fetchAdminUsers(): Promise<AdminUserRow[]> {
@@ -66,8 +74,7 @@ export async function fetchAdminUsers(): Promise<AdminUserRow[]> {
     headers: await authHeaders(),
   })
   if (!res.ok) {
-    const j = await res.json().catch(() => ({}))
-    throw new Error((j as { error?: string }).error || res.statusText)
+    throw await adminApiError(res)
   }
   const j = (await res.json()) as { users: AdminUserRow[] }
   return j.users
@@ -80,8 +87,7 @@ export async function setUserAdmin(userId: string, isAdmin: boolean): Promise<vo
     body: JSON.stringify({ userId, isAdmin }),
   })
   if (!res.ok) {
-    const j = await res.json().catch(() => ({}))
-    throw new Error((j as { error?: string }).error || res.statusText)
+    throw await adminApiError(res)
   }
 }
 
@@ -92,7 +98,6 @@ export async function deleteAdminUser(userId: string): Promise<void> {
     body: JSON.stringify({ userId }),
   })
   if (!res.ok) {
-    const j = await res.json().catch(() => ({}))
-    throw new Error((j as { error?: string }).error || res.statusText)
+    throw await adminApiError(res)
   }
 }
