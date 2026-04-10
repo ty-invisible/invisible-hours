@@ -69,7 +69,7 @@ function loadTheme(): Theme {
     const v = localStorage.getItem(THEME_KEY)
     if (v === 'light' || v === 'dark' || v === 'system') return v
   } catch { /* noop */ }
-  return 'system'
+  return 'dark'
 }
 
 function loadShowWeekends(): boolean {

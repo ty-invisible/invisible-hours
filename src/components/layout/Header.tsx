@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase'
@@ -7,7 +8,8 @@ import { useCategoryStore } from '../../store/categoryStore'
 import { useGoogleCalendarStore } from '../../store/googleCalendarStore'
 import { dateKey, getWeekDates } from '../../lib/slots'
 import { buildSummary } from '../../lib/buildSummary'
-import { ChevronLeft, ChevronRight, CopyIcon, UploadIcon, LogOutIcon, SunIcon, MoonIcon, UserIcon, CalendarSyncIcon, UnlinkIcon } from '../ui/Icons'
+import { ChevronLeft, ChevronRight, CopyIcon, LogOutIcon, SunIcon, MoonIcon, UserIcon, CalendarSyncIcon, UnlinkIcon, MenuMoreIcon, AdminIcon } from '../ui/Icons'
+import { contrastColor } from '../../lib/categories'
 import { useUIStore } from '../../store/uiStore'
 import { useResolvedTheme } from '../../hooks/useThemeSync'
 import { useIsMobile } from '../../hooks/useIsMobile'
@@ -24,9 +26,10 @@ interface HeaderProps {
     linkGoogleCalendar: (code: string, redirectUri: string) => Promise<boolean>
     unlinkGoogleCalendar: () => Promise<void>
   }
+  showAdminLink?: boolean
 }
 
-export function Header({ user, sync, gcalSync }: HeaderProps) {
+export function Header({ user, sync, gcalSync, showAdminLink = false }: HeaderProps) {
   const isMobile = useIsMobile()
   const currentDate = useCalendarStore((s) => s.currentDate)
   const viewMode = useCalendarStore((s) => s.viewMode)
@@ -34,6 +37,9 @@ export function Header({ user, sync, gcalSync }: HeaderProps) {
   const setViewMode = useCalendarStore((s) => s.setViewMode)
   const slotData = useCalendarStore((s) => s.slotData)
   const getCategoryLabel = useCategoryStore((s) => s.getCategoryLabel)
+  const getCategoryColor = useCategoryStore((s) => s.getCategoryColor)
+  const activeCategoryId = useCategoryStore((s) => s.activeCategoryId)
+  const eraserOn = useCategoryStore((s) => s.eraserOn)
   const addToast = useUIStore((s) => s.addToast)
   const setTheme = useUIStore((s) => s.setTheme)
   const showWeekends = useUIStore((s) => s.showWeekends)
@@ -107,40 +113,42 @@ export function Header({ user, sync, gcalSync }: HeaderProps) {
     return (
       <>
         <header className="bg-header flex-shrink-0 px-3" style={{ zIndex: 40 }}>
-          {/* Row 1: brand + date nav */}
+          {/* Row 1: brand + date nav — fixed Today column so the picker stays centered */}
           <div className="h-11 flex items-center gap-2">
-            <span className="text-white font-semibold text-xs whitespace-nowrap">IH™</span>
-            <div className="flex-1 flex items-center justify-center gap-1">
+            <span className="text-white font-semibold text-xs whitespace-nowrap">Hours™</span>
+            <div className="flex-1 flex items-center justify-center gap-1 min-w-0">
               <button
                 onClick={() => navigate(-1)}
-                className="text-white/70 active:text-white w-8 h-8 flex items-center justify-center rounded-lg"
+                className="text-white/70 active:text-white w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-lg"
               >
                 <ChevronLeft size={18} />
               </button>
-              <span className="text-white text-xs font-medium text-center">
+              <span className="text-white text-xs font-medium text-center truncate px-0.5">
                 {dateLabel}
               </span>
               <button
                 onClick={() => navigate(1)}
-                className="text-white/70 active:text-white w-8 h-8 flex items-center justify-center rounded-lg"
+                className="text-white/70 active:text-white w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-lg"
               >
                 <ChevronRight size={18} />
               </button>
             </div>
-            <AnimatePresence initial={false}>
-              {!isToday && (
-                <motion.button
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  transition={{ duration: 0.15 }}
-                  onClick={goToday}
-                  className="px-2.5 py-1 rounded-md bg-accent text-white text-xs font-medium"
-                >
-                  Today
-                </motion.button>
-              )}
-            </AnimatePresence>
+            <div className="w-[68px] flex justify-end flex-shrink-0">
+              <AnimatePresence initial={false}>
+                {!isToday && (
+                  <motion.button
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    transition={{ duration: 0.15 }}
+                    onClick={goToday}
+                    className="px-2.5 py-1 rounded-md bg-accent text-white text-xs font-medium"
+                  >
+                    Today
+                  </motion.button>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
 
           {/* Row 2: toggles + action icons */}
@@ -195,22 +203,28 @@ export function Header({ user, sync, gcalSync }: HeaderProps) {
               )}
             </AnimatePresence>
 
-            <div className="flex-1" />
+            <div className="flex-1 min-w-0" />
 
-            <button
-              onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
-              className="text-white/70 active:text-white w-8 h-8 flex items-center justify-center rounded-lg"
-            >
-              {resolvedTheme === 'dark' ? <SunIcon size={16} /> : <MoonIcon size={16} />}
-            </button>
-            <button
-              onClick={handleCopy}
-              className="text-white/70 active:text-white w-8 h-8 flex items-center justify-center rounded-lg"
-            >
-              <CopyIcon size={16} />
-            </button>
-            <AccountMenu gcalSync={gcalSync} mobile />
-          
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {activeCategoryId && !eraserOn && (
+                <span
+                  className="max-w-[min(42vw,11rem)] truncate rounded-full px-2 py-0.5 text-[10px] font-semibold leading-tight"
+                  style={{
+                    backgroundColor: getCategoryColor(activeCategoryId),
+                    color: contrastColor(getCategoryColor(activeCategoryId)),
+                  }}
+                >
+                  {getCategoryLabel(activeCategoryId)}
+                </span>
+              )}
+              <MobileOverflowMenu
+                gcalSync={gcalSync}
+                resolvedTheme={resolvedTheme}
+                onToggleTheme={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+                onCopy={handleCopy}
+                showAdminLink={showAdminLink}
+              />
+            </div>
           </div>
         </header>
         {showRestore && (
@@ -338,7 +352,7 @@ export function Header({ user, sync, gcalSync }: HeaderProps) {
           >
             <CopyIcon size={20} />
           </button>
-          <AccountMenu gcalSync={gcalSync} />
+          <AccountMenu gcalSync={gcalSync} showAdminLink={showAdminLink} />
         </div>
       </header>
       {showRestore && (
@@ -351,10 +365,168 @@ export function Header({ user, sync, gcalSync }: HeaderProps) {
   )
 }
 
-function AccountMenu({ gcalSync, mobile }: {
+function MobileOverflowMenu({
+  gcalSync,
+  resolvedTheme,
+  onToggleTheme,
+  onCopy,
+  showAdminLink = false,
+}: {
   gcalSync?: HeaderProps['gcalSync']
-  mobile?: boolean
+  resolvedTheme: 'light' | 'dark'
+  onToggleTheme: () => void
+  onCopy: () => void
+  showAdminLink?: boolean
 }) {
+  const navigate = useNavigate()
+  const [open, setOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const gcalLinked = useGoogleCalendarStore((s) => s.linked)
+
+  useEffect(() => {
+    if (!open) return
+    const handleOutside = (e: MouseEvent | TouchEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleOutside)
+    document.addEventListener('touchstart', handleOutside, { passive: true })
+    return () => {
+      document.removeEventListener('mousedown', handleOutside)
+      document.removeEventListener('touchstart', handleOutside)
+    }
+  }, [open])
+
+  const handleGcalConnect = () => {
+    if (!GOOGLE_CLIENT_ID) return
+    const redirectUri = `${window.location.origin}${window.location.pathname}`
+    const params = new URLSearchParams({
+      client_id: GOOGLE_CLIENT_ID,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: 'https://www.googleapis.com/auth/calendar.readonly',
+      access_type: 'offline',
+      prompt: 'consent',
+      state: 'google-calendar',
+    })
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`
+  }
+
+  const handleGcalDisconnect = () => {
+    gcalSync?.unlinkGoogleCalendar()
+    setOpen(false)
+  }
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="text-white/70 active:text-white w-8 h-8 flex items-center justify-center rounded-lg"
+        title="Menu"
+        aria-expanded={open}
+        aria-haspopup="true"
+      >
+        <MenuMoreIcon size={18} />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -4, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.95 }}
+            transition={{ duration: 0.12 }}
+            className="absolute right-0 top-full mt-1 w-56 bg-surface border border-border rounded-lg shadow-lg overflow-hidden"
+            style={{ zIndex: 50 }}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                onToggleTheme()
+                setOpen(false)
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-muted hover:text-text hover:bg-bg transition-colors"
+            >
+              {resolvedTheme === 'dark' ? <SunIcon size={15} /> : <MoonIcon size={15} />}
+              {resolvedTheme === 'dark' ? 'Light mode' : 'Dark mode'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onCopy()
+                setOpen(false)
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-muted hover:text-text hover:bg-bg transition-colors"
+            >
+              <CopyIcon size={15} />
+              Copy summary
+            </button>
+            {GOOGLE_CLIENT_ID && (
+              <div className="border-t border-border">
+                {gcalLinked ? (
+                  <button
+                    type="button"
+                    onClick={handleGcalDisconnect}
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-muted hover:text-text hover:bg-bg transition-colors"
+                  >
+                    <UnlinkIcon size={15} />
+                    Disconnect Google Calendar
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleGcalConnect()
+                      setOpen(false)
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-muted hover:text-text hover:bg-bg transition-colors"
+                  >
+                    <CalendarSyncIcon size={15} />
+                    Connect Google Calendar
+                  </button>
+                )}
+              </div>
+            )}
+            {showAdminLink && (
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false)
+                  navigate('/admin')
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-muted hover:text-text hover:bg-bg transition-colors border-t border-border"
+              >
+                <AdminIcon size={15} />
+                Admin
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false)
+                supabase.auth.signOut()
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-muted hover:text-text hover:bg-bg transition-colors border-t border-border"
+            >
+              <LogOutIcon size={15} />
+              Sign out
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+function AccountMenu({
+  gcalSync,
+  showAdminLink = false,
+}: {
+  gcalSync?: HeaderProps['gcalSync']
+  showAdminLink?: boolean
+}) {
+  const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const gcalLinked = useGoogleCalendarStore((s) => s.linked)
@@ -390,19 +562,14 @@ function AccountMenu({ gcalSync, mobile }: {
     setOpen(false)
   }
 
-  const iconSize = mobile ? 16 : 20
-  const btnClass = mobile
-    ? 'text-white/70 active:text-white w-8 h-8 flex items-center justify-center rounded-lg'
-    : 'text-white/70 hover:text-white w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors'
-
   return (
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setOpen(!open)}
-        className={btnClass}
+        className="text-white/70 hover:text-white w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors"
         title="Account"
       >
-        <UserIcon size={iconSize} />
+        <UserIcon size={20} />
       </button>
       <AnimatePresence>
         {open && (
@@ -433,7 +600,21 @@ function AccountMenu({ gcalSync, mobile }: {
                 </button>
               )
             )}
+            {showAdminLink && (
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false)
+                  navigate('/admin')
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-muted hover:text-text hover:bg-bg transition-colors border-t border-border"
+              >
+                <AdminIcon size={15} />
+                Admin
+              </button>
+            )}
             <button
+              type="button"
               onClick={() => { setOpen(false); supabase.auth.signOut() }}
               className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-muted hover:text-text hover:bg-bg transition-colors border-t border-border"
             >

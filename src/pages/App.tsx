@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
+import { Routes, Route } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Login } from './Login'
+import { AdminPage } from './AdminPage'
 import { Header } from '../components/layout/Header'
 import { PaletteColumn } from '../components/layout/PaletteColumn'
 import { CalendarColumn } from '../components/layout/CalendarColumn'
@@ -14,6 +16,7 @@ import { useGoogleCalendarSync } from '../hooks/useGoogleCalendarSync'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { useThemeSync } from '../hooks/useThemeSync'
 import { useIsMobile } from '../hooks/useIsMobile'
+import { useAdminStatus } from '../hooks/useAdminStatus'
 import { SwatchIcon, CalendarIcon, BarChartIcon } from '../components/ui/Icons'
 
 export default function App() {
@@ -72,10 +75,26 @@ export default function App() {
     return <Login />
   }
 
-  return <AuthenticatedApp user={user} />
+  return <AuthenticatedRoutes user={user} />
 }
 
-function AuthenticatedApp({ user }: { user: User }) {
+function AuthenticatedRoutes({ user }: { user: User }) {
+  const admin = useAdminStatus(user)
+  return (
+    <Routes>
+      <Route path="/admin" element={<AdminPage user={user} admin={admin} />} />
+      <Route path="/*" element={<AuthenticatedApp user={user} admin={admin} />} />
+    </Routes>
+  )
+}
+
+function AuthenticatedApp({
+  user,
+  admin,
+}: {
+  user: User
+  admin: { isAdmin: boolean; loading: boolean }
+}) {
   const isMobile = useIsMobile()
   const paletteWidth = useUIStore((s) => s.paletteWidth)
   const statsWidth = useUIStore((s) => s.statsWidth)
@@ -109,7 +128,7 @@ function AuthenticatedApp({ user }: { user: User }) {
   if (isMobile) {
     return (
       <div className="h-full flex flex-col overflow-hidden">
-        <Header user={user} sync={sync} gcalSync={gcalSync} />
+        <Header user={user} sync={sync} gcalSync={gcalSync} showAdminLink={admin.isAdmin && !admin.loading} />
         <div className="flex-1 min-h-0 overflow-hidden">
           {mobileTab === 'palette' && <PaletteColumn sync={sync} />}
           {mobileTab === 'calendar' && <CalendarColumn sync={sync} />}
@@ -123,7 +142,7 @@ function AuthenticatedApp({ user }: { user: User }) {
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      <Header user={user} sync={sync} gcalSync={gcalSync} />
+      <Header user={user} sync={sync} gcalSync={gcalSync} showAdminLink={admin.isAdmin && !admin.loading} />
       <div className="flex flex-1 min-h-0">
         {!focusMode && (
           <>
