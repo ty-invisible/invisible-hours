@@ -400,7 +400,7 @@ function MobileOverflowMenu({
 
   const handleGcalConnect = () => {
     if (!GOOGLE_CLIENT_ID) return
-    const redirectUri = `${window.location.origin}${window.location.pathname}`
+    const redirectUri = window.location.origin
     const params = new URLSearchParams({
       client_id: GOOGLE_CLIENT_ID,
       redirect_uri: redirectUri,
@@ -544,7 +544,7 @@ function AccountMenu({
 
   const handleGcalConnect = () => {
     if (!GOOGLE_CLIENT_ID) return
-    const redirectUri = `${window.location.origin}${window.location.pathname}`
+    const redirectUri = window.location.origin
     const params = new URLSearchParams({
       client_id: GOOGLE_CLIENT_ID,
       redirect_uri: redirectUri,

@@ -113,7 +113,7 @@ function AuthenticatedApp({
     const code = params.get('code')
     const state = params.get('state')
     if (code && state === 'google-calendar') {
-      const redirectUri = `${window.location.origin}${window.location.pathname}`
+      const redirectUri = window.location.origin
       window.history.replaceState({}, '', window.location.pathname)
       gcalSync.linkGoogleCalendar(code, redirectUri).then((ok) => {
         if (ok) {
