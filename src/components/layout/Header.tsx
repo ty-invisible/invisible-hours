@@ -6,14 +6,15 @@ import { supabase } from '../../lib/supabase'
 import { useCalendarStore } from '../../store/calendarStore'
 import { useCategoryStore } from '../../store/categoryStore'
 import { useGoogleCalendarStore } from '../../store/googleCalendarStore'
-import { dateKey, getWeekDates } from '../../lib/slots'
+import { dateKey, getWeekDates, getMonthDates, type SlotGranularity } from '../../lib/slots'
 import { buildSummary } from '../../lib/buildSummary'
-import { ChevronLeft, ChevronRight, CopyIcon, LogOutIcon, SunIcon, MoonIcon, UserIcon, CalendarSyncIcon, UnlinkIcon, MenuMoreIcon, AdminIcon } from '../ui/Icons'
+import { ChevronLeft, ChevronRight, CopyIcon, LogOutIcon, SunIcon, MoonIcon, UserIcon, CalendarSyncIcon, UnlinkIcon, MenuMoreIcon, AdminIcon, MergeIcon } from '../ui/Icons'
 import { contrastColor } from '../../lib/categories'
 import { useUIStore } from '../../store/uiStore'
 import { useResolvedTheme } from '../../hooks/useThemeSync'
 import { useIsMobile } from '../../hooks/useIsMobile'
 import { RestoreModal } from './RestoreModal'
+import { MergeCategoriesModal } from './MergeCategoriesModal'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string
 
@@ -21,6 +22,8 @@ interface HeaderProps {
   user: User
   sync: {
     bulkImportEntries: (entries: Array<{ date: string; slot_key: string; category_id: string; note: string }>) => Promise<void>
+    mergeCategories: (sourceCatId: string, targetCatId: string) => Promise<void>
+    saveSlotGranularity?: () => Promise<void>
   }
   gcalSync?: {
     linkGoogleCalendar: (code: string, redirectUri: string) => Promise<boolean>
@@ -44,13 +47,25 @@ export function Header({ user, sync, gcalSync, showAdminLink = false }: HeaderPr
   const setTheme = useUIStore((s) => s.setTheme)
   const showWeekends = useUIStore((s) => s.showWeekends)
   const setShowWeekends = useUIStore((s) => s.setShowWeekends)
+  const slotGranularity = useUIStore((s) => s.slotGranularity)
+  const setSlotGranularity = useUIStore((s) => s.setSlotGranularity)
   const resolvedTheme = useResolvedTheme()
   const [showRestore, setShowRestore] = useState(false)
+  const [showMerge, setShowMerge] = useState(false)
+
+  const handleGranularityChange = (g: SlotGranularity) => {
+    setSlotGranularity(g)
+    sync.saveSlotGranularity?.()
+  }
 
   const todayDk = dateKey(new Date())
 
   const isToday = useMemo(() => {
     if (viewMode === 'day') return dateKey(currentDate) === todayDk
+    if (viewMode === 'month') {
+      const now = new Date()
+      return currentDate.getFullYear() === now.getFullYear() && currentDate.getMonth() === now.getMonth()
+    }
     const week = getWeekDates(currentDate)
     const todayWeek = getWeekDates(new Date())
     return week.some((d) => dateKey(d) === todayDk) &&
@@ -61,8 +76,10 @@ export function Header({ user, sync, gcalSync, showAdminLink = false }: HeaderPr
     const d = new Date(currentDate)
     if (viewMode === 'day') {
       d.setDate(d.getDate() + dir)
-    } else {
+    } else if (viewMode === 'week') {
       d.setDate(d.getDate() + dir * 7)
+    } else {
+      d.setMonth(d.getMonth() + dir)
     }
     setCurrentDate(d, dir)
   }
@@ -90,6 +107,10 @@ export function Header({ user, sync, gcalSync, showAdminLink = false }: HeaderPr
         opts.year = 'numeric'
       }
       return currentDate.toLocaleDateString('en-US', opts)
+    } else if (viewMode === 'month') {
+      const opts: Intl.DateTimeFormatOptions = { month: 'long' }
+      if (currentDate.getFullYear() !== thisYear) opts.year = 'numeric'
+      return currentDate.toLocaleDateString('en-US', opts)
     } else {
       const week = getWeekDates(currentDate)
       const mon = week[0]
@@ -101,9 +122,16 @@ export function Header({ user, sync, gcalSync, showAdminLink = false }: HeaderPr
   }, [currentDate, viewMode, isMobile])
 
   const handleCopy = () => {
-    const dates = viewMode === 'day'
-      ? [dateKey(currentDate)]
-      : getWeekDates(currentDate).map(dateKey)
+    let dates: string[]
+    if (viewMode === 'day') {
+      dates = [dateKey(currentDate)]
+    } else if (viewMode === 'week') {
+      dates = getWeekDates(currentDate).map(dateKey)
+    } else {
+      const year = currentDate.getFullYear(), month = currentDate.getMonth()
+      const daysInMonth = new Date(year, month + 1, 0).getDate()
+      dates = Array.from({ length: daysInMonth }, (_, i) => dateKey(new Date(year, month, i + 1)))
+    }
     const tsv = buildSummary(dates, slotData, getCategoryLabel)
     navigator.clipboard.writeText(tsv)
     addToast({ message: 'Copied to clipboard', type: 'success' })
@@ -170,6 +198,14 @@ export function Header({ user, sync, gcalSync, showAdminLink = false }: HeaderPr
               >
                 Week
               </button>
+              <button
+                onClick={() => setViewMode('month')}
+                className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                  viewMode === 'month' ? 'bg-white text-header' : 'text-white/70'
+                }`}
+              >
+                Month
+              </button>
             </div>
 
             <AnimatePresence>
@@ -223,6 +259,9 @@ export function Header({ user, sync, gcalSync, showAdminLink = false }: HeaderPr
                 onToggleTheme={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
                 onCopy={handleCopy}
                 showAdminLink={showAdminLink}
+                slotGranularity={slotGranularity}
+                onGranularityChange={handleGranularityChange}
+                onMergeCategories={() => setShowMerge(true)}
               />
             </div>
           </div>
@@ -231,6 +270,12 @@ export function Header({ user, sync, gcalSync, showAdminLink = false }: HeaderPr
           <RestoreModal
             onClose={() => setShowRestore(false)}
             onImport={sync.bulkImportEntries}
+          />
+        )}
+        {showMerge && (
+          <MergeCategoriesModal
+            onClose={() => setShowMerge(false)}
+            onMerge={sync.mergeCategories}
           />
         )}
       </>
@@ -265,7 +310,7 @@ export function Header({ user, sync, gcalSync, showAdminLink = false }: HeaderPr
             <ChevronRight size={22} />
           </button>
 
-          {/* Day / Week toggle */}
+          {/* Day / Week / Month toggle */}
           <div className="flex bg-white/10 rounded-lg p-0.5 ml-2">
             <button
               onClick={() => setViewMode('day')}
@@ -282,6 +327,14 @@ export function Header({ user, sync, gcalSync, showAdminLink = false }: HeaderPr
               }`}
             >
               Week
+            </button>
+            <button
+              onClick={() => setViewMode('month')}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'month' ? 'bg-white text-header' : 'text-white/70 hover:text-white'
+              }`}
+            >
+              Month
             </button>
           </div>
 
@@ -352,13 +405,19 @@ export function Header({ user, sync, gcalSync, showAdminLink = false }: HeaderPr
           >
             <CopyIcon size={20} />
           </button>
-          <AccountMenu gcalSync={gcalSync} showAdminLink={showAdminLink} />
+          <AccountMenu gcalSync={gcalSync} showAdminLink={showAdminLink} slotGranularity={slotGranularity} onGranularityChange={handleGranularityChange} onMergeCategories={() => setShowMerge(true)} />
         </div>
       </header>
       {showRestore && (
         <RestoreModal
           onClose={() => setShowRestore(false)}
           onImport={sync.bulkImportEntries}
+        />
+      )}
+      {showMerge && (
+        <MergeCategoriesModal
+          onClose={() => setShowMerge(false)}
+          onMerge={sync.mergeCategories}
         />
       )}
     </>
@@ -371,12 +430,18 @@ function MobileOverflowMenu({
   onToggleTheme,
   onCopy,
   showAdminLink = false,
+  slotGranularity,
+  onGranularityChange,
+  onMergeCategories,
 }: {
   gcalSync?: HeaderProps['gcalSync']
   resolvedTheme: 'light' | 'dark'
   onToggleTheme: () => void
   onCopy: () => void
   showAdminLink?: boolean
+  slotGranularity: SlotGranularity
+  onGranularityChange: (g: SlotGranularity) => void
+  onMergeCategories: () => void
 }) {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
@@ -462,6 +527,39 @@ function MobileOverflowMenu({
               <CopyIcon size={15} />
               Copy summary
             </button>
+            <div className="border-t border-border px-3 py-2.5">
+              <span className="text-[10px] text-muted uppercase tracking-wide">Slot size</span>
+              <div className="flex gap-1 mt-1.5">
+                {([15, 30, 60] as const).map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => {
+                      onGranularityChange(g)
+                      setOpen(false)
+                    }}
+                    className={`flex-1 py-1 rounded text-xs font-medium transition-colors ${
+                      slotGranularity === g
+                        ? 'bg-accent text-white'
+                        : 'bg-bg text-muted hover:text-text'
+                    }`}
+                  >
+                    {g === 60 ? '1h' : `${g}m`}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false)
+                onMergeCategories()
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-muted hover:text-text hover:bg-bg transition-colors border-t border-border"
+            >
+              <MergeIcon size={15} />
+              Merge Categories
+            </button>
             {GOOGLE_CLIENT_ID && (
               <div className="border-t border-border">
                 {gcalLinked ? (
@@ -522,9 +620,15 @@ function MobileOverflowMenu({
 function AccountMenu({
   gcalSync,
   showAdminLink = false,
+  slotGranularity,
+  onGranularityChange,
+  onMergeCategories,
 }: {
   gcalSync?: HeaderProps['gcalSync']
   showAdminLink?: boolean
+  slotGranularity: SlotGranularity
+  onGranularityChange: (g: SlotGranularity) => void
+  onMergeCategories: () => void
 }) {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
@@ -581,11 +685,41 @@ function AccountMenu({
             className="absolute right-0 top-full mt-1 w-56 bg-surface border border-border rounded-lg shadow-lg overflow-hidden"
             style={{ zIndex: 50 }}
           >
+            <div className="px-3 py-2.5">
+              <span className="text-[10px] text-muted uppercase tracking-wide">Slot size</span>
+              <div className="flex gap-1 mt-1.5">
+                {([15, 30, 60] as const).map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => onGranularityChange(g)}
+                    className={`flex-1 py-1 rounded text-xs font-medium transition-colors ${
+                      slotGranularity === g
+                        ? 'bg-accent text-white'
+                        : 'bg-bg text-muted hover:text-text'
+                    }`}
+                  >
+                    {g === 60 ? '1h' : `${g}m`}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false)
+                onMergeCategories()
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-muted hover:text-text hover:bg-bg transition-colors border-t border-border"
+            >
+              <MergeIcon size={15} />
+              Merge Categories
+            </button>
             {GOOGLE_CLIENT_ID && (
               gcalLinked ? (
                 <button
                   onClick={handleGcalDisconnect}
-                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-muted hover:text-text hover:bg-bg transition-colors"
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-muted hover:text-text hover:bg-bg transition-colors border-t border-border"
                 >
                   <UnlinkIcon size={15} />
                   Disconnect Google Calendar
@@ -593,7 +727,7 @@ function AccountMenu({
               ) : (
                 <button
                   onClick={handleGcalConnect}
-                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-muted hover:text-text hover:bg-bg transition-colors"
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-muted hover:text-text hover:bg-bg transition-colors border-t border-border"
                 >
                   <CalendarSyncIcon size={15} />
                   Connect Google Calendar

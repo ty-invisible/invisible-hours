@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { WORKDAY_START_DEFAULT, WORKDAY_END_DEFAULT } from '../lib/slots'
+import { WORKDAY_START_DEFAULT, WORKDAY_END_DEFAULT, type SlotGranularity } from '../lib/slots'
 
 export type SaveStatus = 'idle' | 'saving' | 'saved'
 export type Theme = 'light' | 'dark' | 'system'
@@ -22,6 +22,7 @@ interface UIState {
   showWeekends: boolean
   focusMode: boolean
   mobileTab: MobileTab
+  slotGranularity: SlotGranularity
 
   setPaletteWidth: (w: number) => void
   setStatsWidth: (w: number) => void
@@ -33,6 +34,7 @@ interface UIState {
   setShowWeekends: (show: boolean) => void
   toggleFocusMode: () => void
   setMobileTab: (tab: MobileTab) => void
+  setSlotGranularity: (g: SlotGranularity) => void
 }
 
 const PALETTE_KEY = 'idt-palette-w'
@@ -40,6 +42,8 @@ const STATS_KEY = 'idt-stats-w'
 const WORKDAY_KEY = 'invisible_hours_work_day'
 const THEME_KEY = 'idt-theme'
 const WEEKENDS_KEY = 'idt-show-weekends'
+const GRANULARITY_KEY = 'idt-slot-granularity'
+const WORKDAY_MIGRATED_KEY = 'idt-workday-migrated-96'
 
 function loadWidth(key: string, fallback: number): number {
   try {
@@ -54,9 +58,18 @@ function loadWorkDayRange(): { start: number; end: number } {
     const v = localStorage.getItem(WORKDAY_KEY)
     if (v) {
       const [start, end] = JSON.parse(v)
-      const s = Math.max(0, Math.min(47, Number(start)))
-      const e = Math.max(0, Math.min(47, Number(end)))
-      if (!Number.isNaN(s) && !Number.isNaN(e)) return { start: s, end: e }
+      let s = Math.max(0, Number(start))
+      let e = Math.max(0, Number(end))
+      if (!Number.isNaN(s) && !Number.isNaN(e)) {
+        const migrated = localStorage.getItem(WORKDAY_MIGRATED_KEY)
+        if (!migrated && s <= 47 && e <= 47) {
+          s = s * 2
+          e = e * 2 + 1
+          localStorage.setItem(WORKDAY_KEY, JSON.stringify([s, e]))
+          localStorage.setItem(WORKDAY_MIGRATED_KEY, '1')
+        }
+        return { start: Math.min(95, s), end: Math.min(95, e) }
+      }
     }
   } catch { /* noop */ }
   return { start: WORKDAY_START_DEFAULT, end: WORKDAY_END_DEFAULT }
@@ -80,6 +93,14 @@ function loadShowWeekends(): boolean {
   return true
 }
 
+function loadSlotGranularity(): SlotGranularity {
+  try {
+    const v = localStorage.getItem(GRANULARITY_KEY)
+    if (v === '15' || v === '30' || v === '60') return Number(v) as SlotGranularity
+  } catch { /* noop */ }
+  return 30
+}
+
 export const useUIStore = create<UIState>((set) => ({
   paletteWidth: loadWidth(PALETTE_KEY, 220),
   statsWidth: loadWidth(STATS_KEY, 280),
@@ -91,6 +112,7 @@ export const useUIStore = create<UIState>((set) => ({
   showWeekends: loadShowWeekends(),
   focusMode: false,
   mobileTab: 'calendar',
+  slotGranularity: loadSlotGranularity(),
 
   setPaletteWidth: (w) => {
     localStorage.setItem(PALETTE_KEY, String(w))
@@ -103,8 +125,8 @@ export const useUIStore = create<UIState>((set) => ({
   },
 
   setWorkDayRange: (startIndex, endIndex) => {
-    const s = Math.max(0, Math.min(47, startIndex))
-    const e = Math.max(0, Math.min(47, endIndex))
+    const s = Math.max(0, Math.min(95, startIndex))
+    const e = Math.max(0, Math.min(95, endIndex))
     localStorage.setItem(WORKDAY_KEY, JSON.stringify([s, e]))
     set({ workDayStartIndex: s, workDayEndIndex: e })
   },
@@ -124,6 +146,11 @@ export const useUIStore = create<UIState>((set) => ({
   setMobileTab: (tab) => set({ mobileTab: tab }),
 
   setSaveStatus: (s) => set({ saveStatus: s }),
+
+  setSlotGranularity: (g) => {
+    localStorage.setItem(GRANULARITY_KEY, String(g))
+    set({ slotGranularity: g })
+  },
 
   addToast: (toast) =>
     set((state) => ({

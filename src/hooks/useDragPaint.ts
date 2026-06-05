@@ -1,7 +1,8 @@
 import { useRef, useCallback, useState, useEffect } from 'react'
 import { useCalendarStore, type SlotData, type SlotEntry } from '../store/calendarStore'
 import { useCategoryStore } from '../store/categoryStore'
-import { SLOT_INDEX, SLOTS } from '../lib/slots'
+import { SLOT_INDEX, SLOTS, SLOT_MINUTES, type SlotGranularity } from '../lib/slots'
+import { useUIStore } from '../store/uiStore'
 
 /**
  * Commit tap-to-paint only if the finger stays within this radius (px) of touchstart.
@@ -22,8 +23,27 @@ interface DragPaintResult {
   isDragging: boolean
 }
 
-function slotKeyFromIndex(i: number): string {
-  return SLOTS[i].key
+function getChunkBaseKeys(displayKey: string, granularity: SlotGranularity): string[] {
+  const step = granularity / SLOT_MINUTES
+  const baseIdx = SLOT_INDEX[displayKey]
+  if (baseIdx === undefined) return [displayKey]
+  const keys: string[] = []
+  for (let i = 0; i < step && baseIdx + i < SLOTS.length; i++) {
+    keys.push(SLOTS[baseIdx + i].key)
+  }
+  return keys
+}
+
+function displayIndexFromKey(displayKey: string, granularity: SlotGranularity): number {
+  const step = granularity / SLOT_MINUTES
+  const baseIdx = SLOT_INDEX[displayKey]
+  return Math.floor(baseIdx / step)
+}
+
+function displayKeyFromIndex(displayIndex: number, granularity: SlotGranularity): string {
+  const step = granularity / SLOT_MINUTES
+  const baseIdx = displayIndex * step
+  return SLOTS[baseIdx].key
 }
 
 export function useDragPaint(onStrokeComplete?: (dk: string, changes: Record<string, SlotEntry | null>) => void): DragPaintResult {
@@ -76,6 +96,14 @@ export function useDragPaint(onStrokeComplete?: (dk: string, changes: Record<str
     dragStroke.current.add(slotKey)
   }, [])
 
+  const paintChunk = useCallback((dk: string, displayKey: string) => {
+    const granularity = useUIStore.getState().slotGranularity
+    const baseKeys = getChunkBaseKeys(displayKey, granularity)
+    for (const key of baseKeys) {
+      paintSlot(dk, key)
+    }
+  }, [paintSlot])
+
   const restoreSlot = useCallback((dk: string, slotKey: string) => {
     if (!dragStroke.current.has(slotKey)) return
     const { setSlot } = useCalendarStore.getState()
@@ -85,49 +113,66 @@ export function useDragPaint(onStrokeComplete?: (dk: string, changes: Record<str
     delete strokeChanges.current[slotKey]
   }, [])
 
-  const fillGap = useCallback((dk: string, fromKey: string, toKey: string) => {
-    const fromIdx = SLOT_INDEX[fromKey]
-    const toIdx = SLOT_INDEX[toKey]
-    const step = toIdx > fromIdx ? 1 : -1
+  const restoreChunk = useCallback((dk: string, displayKey: string) => {
+    const granularity = useUIStore.getState().slotGranularity
+    const baseKeys = getChunkBaseKeys(displayKey, granularity)
+    for (const key of baseKeys) {
+      restoreSlot(dk, key)
+    }
+  }, [restoreSlot])
 
-    for (let i = fromIdx + step; step > 0 ? i <= toIdx : i >= toIdx; i += step) {
-      const key = slotKeyFromIndex(i)
-      if (!dragStroke.current.has(key)) {
-        paintSlot(dk, key)
+  const fillGap = useCallback((dk: string, fromKey: string, toKey: string) => {
+    const granularity = useUIStore.getState().slotGranularity
+    const fromDI = displayIndexFromKey(fromKey, granularity)
+    const toDI = displayIndexFromKey(toKey, granularity)
+    const step = toDI > fromDI ? 1 : -1
+
+    for (let di = fromDI + step; step > 0 ? di <= toDI : di >= toDI; di += step) {
+      const dKey = displayKeyFromIndex(di, granularity)
+      const baseKeys = getChunkBaseKeys(dKey, granularity)
+      const anyPainted = baseKeys.some((k) => dragStroke.current.has(k))
+      if (!anyPainted) {
+        paintChunk(dk, dKey)
       }
     }
-  }, [paintSlot])
+  }, [paintChunk])
 
   const enterSlot = useCallback((dk: string, slotKey: string) => {
     if (!isDragging.current) return
     if (dk !== dragDateKey.current) return
     if (slotKey === dragLastKey.current) return
 
-    const currentIdx = SLOT_INDEX[slotKey]
-    const lastIdx = SLOT_INDEX[dragLastKey.current]
+    const granularity = useUIStore.getState().slotGranularity
+    const currentDI = displayIndexFromKey(slotKey, granularity)
+    const lastDI = displayIndexFromKey(dragLastKey.current, granularity)
 
-    if (dragStroke.current.has(slotKey)) {
-      const minIdx = Math.min(currentIdx, lastIdx)
-      const maxIdx = Math.max(currentIdx, lastIdx)
+    const baseKeys = getChunkBaseKeys(slotKey, granularity)
+    const alreadyPainted = baseKeys.some((k) => dragStroke.current.has(k))
 
-      for (let i = minIdx; i <= maxIdx; i++) {
-        restoreSlot(dk, slotKeyFromIndex(i))
+    if (alreadyPainted) {
+      const minDI = Math.min(currentDI, lastDI)
+      const maxDI = Math.max(currentDI, lastDI)
+
+      for (let di = minDI; di <= maxDI; di++) {
+        restoreChunk(dk, displayKeyFromIndex(di, granularity))
       }
     } else {
       fillGap(dk, dragLastKey.current, slotKey)
     }
 
     dragLastKey.current = slotKey
-  }, [restoreSlot, fillGap])
+  }, [restoreChunk, fillGap])
 
   const beginStroke = useCallback((dk: string, slotKey: string) => {
     const { activeCategoryId, eraserOn } = useCategoryStore.getState()
     const { slotData, pushUndo } = useCalendarStore.getState()
+    const granularity = useUIStore.getState().slotGranularity
 
     if (!activeCategoryId && !eraserOn) return
 
     const daySlots = slotData[dk] || {}
-    const existing = daySlots[slotKey]
+    const baseKeys = getChunkBaseKeys(slotKey, granularity)
+    const existing = daySlots[baseKeys[0]]
 
     isDragging.current = true
     setIsDraggingState(true)
@@ -142,19 +187,19 @@ export function useDragPaint(onStrokeComplete?: (dk: string, changes: Record<str
     if (eraserOn) {
       dragMode.current = 'erase'
       dragCategoryId.current = null
-      paintSlot(dk, slotKey)
+      paintChunk(dk, slotKey)
     } else if (activeCategoryId) {
       if (existing && existing.categoryId === activeCategoryId) {
         dragMode.current = 'erase'
         dragCategoryId.current = null
-        paintSlot(dk, slotKey)
+        paintChunk(dk, slotKey)
       } else {
         dragMode.current = 'paint'
         dragCategoryId.current = activeCategoryId
-        paintSlot(dk, slotKey)
+        paintChunk(dk, slotKey)
       }
     }
-  }, [paintSlot])
+  }, [paintChunk])
 
   const endStroke = useCallback(() => {
     if (!isDragging.current) return

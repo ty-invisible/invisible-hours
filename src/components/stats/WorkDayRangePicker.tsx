@@ -2,10 +2,9 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { useUIStore } from '../../store/uiStore'
 
 function formatSlotTime(index: number, asEnd = false): string {
-  // As end time, slot 47 (23:30) displays as 12 AM (midnight)
-  if (asEnd && index === 47) return '12 AM'
-  const hour = Math.floor(index / 2)
-  const min = (index % 2) * 30
+  if (asEnd && index === 95) return '12 AM'
+  const hour = Math.floor(index / 4)
+  const min = (index % 4) * 15
   const period = hour >= 12 ? 'PM' : 'AM'
   const h = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
   const m = min === 0 ? '' : `:${min.toString().padStart(2, '0')}`
@@ -25,21 +24,20 @@ export function WorkDayRangePicker({ onSave, inverted }: WorkDayRangePickerProps
 
   const [dragging, setDragging] = useState<'start' | 'end' | null>(null)
 
-  // Bar represents 0–48 (48 = midnight); we store slots 0–47, so right edge = 12:00am
   const slotFromClientX = useCallback((clientX: number): number => {
     const bar = barRef.current
     if (!bar) return 0
     const rect = bar.getBoundingClientRect()
     const x = clientX - rect.left
     const pct = Math.max(0, Math.min(1, x / rect.width))
-    return Math.round(pct * 48)
+    return Math.round(pct * 96)
   }, [])
 
   const handlePointerMove = useCallback(
     (e: PointerEvent) => {
       if (dragging === null) return
       const raw = slotFromClientX(e.clientX)
-      const slot = Math.min(47, raw) // 48 (midnight) → 47
+      const slot = Math.min(95, raw)
       if (dragging === 'start') {
         const newStart = Math.min(slot, workDayEndIndex)
         setWorkDayRange(newStart, workDayEndIndex)
@@ -68,11 +66,10 @@ export function WorkDayRangePicker({ onSave, inverted }: WorkDayRangePickerProps
     }
   }, [dragging, handlePointerMove, handlePointerUp])
 
-  // Bar has 49 positions (0–48) for dragging; 48 = 12:00am. Show end at 100% when at slot 47 so fill and handle reach the right edge.
   const minIdx = Math.min(workDayStartIndex, workDayEndIndex)
   const maxIdx = Math.max(workDayStartIndex, workDayEndIndex)
-  const startPct = (minIdx / 48) * 100
-  const endPct = maxIdx === 47 ? 100 : (maxIdx / 48) * 100
+  const startPct = (minIdx / 96) * 100
+  const endPct = maxIdx === 95 ? 100 : (maxIdx / 96) * 100
 
   return (
     <div className="flex flex-col gap-1.5">

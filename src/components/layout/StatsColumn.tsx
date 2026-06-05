@@ -2,7 +2,7 @@ import { useMemo, useState, useCallback } from 'react'
 import { useCalendarStore } from '../../store/calendarStore'
 import { useCategoryStore } from '../../store/categoryStore'
 import { useUIStore } from '../../store/uiStore'
-import { dateKey, getWeekDates, getWorkDayKeys } from '../../lib/slots'
+import { dateKey, getWeekDates, getWorkDayKeys, SLOT_MINUTES } from '../../lib/slots'
 import { StatsTabs, type StatsMode } from '../stats/StatsTabs'
 import { DonutChart } from '../stats/DonutChart'
 import { BreakdownList } from '../stats/BreakdownList'
@@ -40,11 +40,18 @@ export function StatsColumn({ sync }: StatsColumnProps) {
   }, [])
 
   const stats = useMemo(() => {
-    let weekDates = viewMode === 'day'
-      ? [currentDate]
-      : getWeekDates(currentDate)
-    if (viewMode === 'week' && !showWeekends) {
-      weekDates = weekDates.filter((d) => d.getDay() !== 0 && d.getDay() !== 6)
+    let weekDates: Date[]
+    if (viewMode === 'day') {
+      weekDates = [currentDate]
+    } else if (viewMode === 'month') {
+      const year = currentDate.getFullYear(), month = currentDate.getMonth()
+      const daysInMonth = new Date(year, month + 1, 0).getDate()
+      weekDates = Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1))
+    } else {
+      weekDates = getWeekDates(currentDate)
+      if (!showWeekends) {
+        weekDates = weekDates.filter((d) => d.getDay() !== 0 && d.getDay() !== 6)
+      }
     }
     const dates = weekDates.map(dateKey)
 
@@ -72,12 +79,12 @@ export function StatsColumn({ sync }: StatsColumnProps) {
       catId: seg.catId,
       label: getCategoryLabel(seg.catId),
       color: seg.color,
-      minutes: seg.value * 30,
+      minutes: seg.value * SLOT_MINUTES,
     }))
 
     const visibleSegments = allSegments.filter((s) => !hiddenCatIds.has(s.catId))
     const visibleSlots = visibleSegments.reduce((a, s) => a + s.value, 0)
-    const visibleMinutes = visibleSlots * 30
+    const visibleMinutes = visibleSlots * SLOT_MINUTES
 
     const segments = visibleSegments.map((s) => ({
       ...s,

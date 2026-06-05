@@ -3,6 +3,7 @@ import { useCalendarStore } from '../../store/calendarStore'
 import { dateKey } from '../../lib/slots'
 import { CalendarGrid } from '../calendar/CalendarGrid'
 import { WeekGrid } from '../calendar/WeekGrid'
+import { MonthGrid } from '../calendar/MonthGrid'
 import type { SlotEntry } from '../../store/calendarStore'
 
 interface CalendarColumnProps {
@@ -53,8 +54,10 @@ export function CalendarColumn({ sync }: CalendarColumnProps) {
       <div ref={contentRef} className="h-full">
         {viewMode === 'day' ? (
           <CalendarGrid onStrokeComplete={onStrokeComplete} onSaveNote={onSaveNote} />
-        ) : (
+        ) : viewMode === 'week' ? (
           <WeekGrid onStrokeComplete={onStrokeComplete} onSaveNote={onSaveNote} />
+        ) : (
+          <MonthGrid />
         )}
       </div>
     </div>

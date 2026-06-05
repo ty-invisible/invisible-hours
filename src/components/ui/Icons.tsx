@@ -211,6 +211,18 @@ export function CalendarSyncIcon({ size = 20, className = '' }: IconProps) {
   )
 }
 
+export function MergeIcon({ size = 20, className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M6 3v6" />
+      <path d="M18 3v6" />
+      <path d="M6 9c0 3 6 6 6 9" />
+      <path d="M18 9c0 3-6 6-6 9" />
+      <path d="M12 18v3" />
+    </svg>
+  )
+}
+
 export function UnlinkIcon({ size = 20, className = '' }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>

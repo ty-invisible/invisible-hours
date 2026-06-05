@@ -1,5 +1,5 @@
 import type { Category } from './categories'
-import { SLOTS, SLOT_INDEX } from './slots'
+import { SLOTS, SLOT_INDEX, SLOT_MINUTES } from './slots'
 import type { SlotData } from '../store/calendarStore'
 
 interface SummaryRow {
@@ -12,8 +12,9 @@ interface SummaryRow {
 }
 
 function formatDuration(slots: number): string {
-  const hours = Math.floor(slots / 2)
-  const mins = (slots % 2) * 30
+  const totalMin = slots * SLOT_MINUTES
+  const hours = Math.floor(totalMin / 60)
+  const mins = totalMin % 60
   if (hours === 0) return `${mins}m`
   if (mins === 0) return `${hours}h`
   return `${hours}h ${mins}m`
@@ -21,7 +22,7 @@ function formatDuration(slots: number): string {
 
 function endTime(slotKey: string): string {
   const idx = SLOT_INDEX[slotKey]
-  if (idx === 47) return '24:00'
+  if (idx === SLOTS.length - 1) return '24:00'
   return SLOTS[idx + 1].key
 }
 

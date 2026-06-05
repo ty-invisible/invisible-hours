@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { AnimatePresence } from 'motion/react'
-import { SLOTS, dateKey } from '../../lib/slots'
+import { dateKey, getDisplaySlots, getDisplaySegments, type SlotGranularity } from '../../lib/slots'
 import { useCalendarStore } from '../../store/calendarStore'
+import { useUIStore } from '../../store/uiStore'
 import { useGoogleCalendarStore } from '../../store/googleCalendarStore'
 import { mapEventsToSlots } from '../../lib/googleCalendarSlots'
 import { SlotCell } from './SlotCell'
@@ -11,8 +12,13 @@ import { useDragPaint } from '../../hooks/useDragPaint'
 import type { SlotEntry } from '../../store/calendarStore'
 import { computeSlotGroupPositions } from '../../lib/slotGroups'
 
-const SLOT_HEIGHT = 48
-const SCROLL_TO_INDEX = 16 // 08:00
+const SLOT_HEIGHTS: Record<SlotGranularity, number> = { 15: 28, 30: 48, 60: 80 }
+
+function scrollIndexForGranularity(granularity: SlotGranularity): number {
+  const minuteTarget = 8 * 60
+  const slotsPerHour = 60 / granularity
+  return Math.floor((minuteTarget / 60) * slotsPerHour)
+}
 
 function formatHourLabel(slotKey: string): string {
   const hour = parseInt(slotKey.split(':')[0], 10)
@@ -32,10 +38,18 @@ export function CalendarGrid({ onStrokeComplete, onSaveNote }: CalendarGridProps
   const currentDate = useCalendarStore((s) => s.currentDate)
   const slotData = useCalendarStore((s) => s.slotData)
   const setFocusedSlot = useCalendarStore((s) => s.setFocusedSlot)
+  const granularity = useUIStore((s) => s.slotGranularity)
 
   const dk = dateKey(currentDate)
   const daySlots = slotData[dk] || {}
-  const groupPositions = useMemo(() => computeSlotGroupPositions(daySlots), [daySlots])
+
+  const displaySlots = useMemo(() => getDisplaySlots(granularity), [granularity])
+  const slotHeight = SLOT_HEIGHTS[granularity]
+
+  const groupPositions = useMemo(
+    () => computeSlotGroupPositions(daySlots, granularity),
+    [daySlots, granularity],
+  )
 
   const gcalVisible = useGoogleCalendarStore((s) => s.visible)
   const gcalEvents = useGoogleCalendarStore((s) => s.eventsByDate[dk])
@@ -64,8 +78,9 @@ export function CalendarGrid({ onStrokeComplete, onSaveNote }: CalendarGridProps
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
+    const scrollIdx = scrollIndexForGranularity(granularity)
     requestAnimationFrame(() => {
-      el.scrollTop = SCROLL_TO_INDEX * SLOT_HEIGHT
+      el.scrollTop = scrollIdx * slotHeight
     })
   }, [])
 
@@ -91,6 +106,8 @@ export function CalendarGrid({ onStrokeComplete, onSaveNote }: CalendarGridProps
     setNotePopup({ dk, slotKey, position: { x: e.clientX, y: e.clientY } })
   }, [])
 
+  const totalHeight = displaySlots.length * slotHeight
+
   return (
     <div className="h-full flex flex-col">
       <div
@@ -100,17 +117,17 @@ export function CalendarGrid({ onStrokeComplete, onSaveNote }: CalendarGridProps
       >
         <div className="relative flex pt-3 pb-3 pr-2">
           {/* Hour labels gutter */}
-          <div className="w-14 flex-shrink-0 relative" style={{ height: SLOTS.length * SLOT_HEIGHT }}>
-            {SLOTS.map((slot) => {
-              const isHour = slot.key.endsWith(':00')
+          <div className="w-14 flex-shrink-0 relative" style={{ height: totalHeight }}>
+            {displaySlots.map((ds) => {
+              const isHour = ds.key.endsWith(':00')
               if (!isHour) return null
               return (
                 <div
-                  key={slot.key}
+                  key={ds.key}
                   className="absolute right-2 text-[11px] text-muted select-none leading-none"
-                  style={{ top: Math.max(0, slot.index * SLOT_HEIGHT - 6) }}
+                  style={{ top: Math.max(0, ds.displayIndex * slotHeight - 6) }}
                 >
-                  {formatHourLabel(slot.key)}
+                  {formatHourLabel(ds.key)}
                 </div>
               )
             })}
@@ -119,25 +136,30 @@ export function CalendarGrid({ onStrokeComplete, onSaveNote }: CalendarGridProps
           {/* Slots column */}
           <div className="flex-1 relative">
             {isToday && <NowLine />}
-            {SLOTS.map((slot) => (
-              <SlotCell
-                key={slot.key}
-                dk={dk}
-                slotKey={slot.key}
-                slotLabel={slot.label}
-                entry={daySlots[slot.key]}
-                googleEvent={gcalSlots[slot.key] ?? null}
-                isDragging={isDragging}
-                groupPosition={groupPositions[slot.key]}
-                onMouseDown={onSlotMouseDown}
-                onMouseEnter={onSlotMouseEnter}
-                onTouchStart={onSlotTouchStart}
-                onTouchEnd={onSlotTouchEnd}
-                onTouchCancel={onSlotTouchCancel}
-                onContextMenu={handleContextMenu}
-                onNoteClick={handleNoteClick}
-              />
-            ))}
+            {displaySlots.map((ds) => {
+              const segments = getDisplaySegments(daySlots, ds.baseKeys)
+              const gcalEvent = gcalSlots[ds.baseKeys[0]] ?? null
+              return (
+                <SlotCell
+                  key={ds.key}
+                  dk={dk}
+                  slotKey={ds.key}
+                  slotLabel={ds.label}
+                  segments={segments}
+                  googleEvent={gcalEvent}
+                  isDragging={isDragging}
+                  groupPosition={groupPositions[ds.key]}
+                  slotHeight={slotHeight}
+                  onMouseDown={onSlotMouseDown}
+                  onMouseEnter={onSlotMouseEnter}
+                  onTouchStart={onSlotTouchStart}
+                  onTouchEnd={onSlotTouchEnd}
+                  onTouchCancel={onSlotTouchCancel}
+                  onContextMenu={handleContextMenu}
+                  onNoteClick={handleNoteClick}
+                />
+              )
+            })}
           </div>
         </div>
       </div>

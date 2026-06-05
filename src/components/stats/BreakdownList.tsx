@@ -1,5 +1,6 @@
 import { motion } from 'motion/react'
 import { useCategoryStore } from '../../store/categoryStore'
+import { SLOT_MINUTES } from '../../lib/slots'
 import { EyeIcon, EyeOffIcon } from '../ui/Icons'
 
 interface BreakdownItem {
@@ -35,7 +36,7 @@ export function BreakdownList({ items, hiddenCatIds, onToggleVisibility }: Break
       {items.map((item, i) => {
         const isHidden = hiddenCatIds.has(item.catId)
         const allTimeSlots = allTimeTotals[item.catId] ?? 0
-        const allTimeMinutes = allTimeSlots * 30
+        const allTimeMinutes = allTimeSlots * SLOT_MINUTES
         return (
           <motion.div
             key={item.catId}

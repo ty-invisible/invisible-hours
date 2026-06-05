@@ -15,14 +15,14 @@ export interface UndoEntry {
 
 interface CalendarState {
   currentDate: Date
-  viewMode: 'day' | 'week'
+  viewMode: 'day' | 'week' | 'month'
   navDirection: -1 | 0 | 1
   slotData: Record<string, SlotData>
   undoStack: UndoEntry[]
   focusedSlot: { dateKey: string; slotKey: string } | null
 
   setCurrentDate: (d: Date, dir?: -1 | 1) => void
-  setViewMode: (mode: 'day' | 'week') => void
+  setViewMode: (mode: 'day' | 'week' | 'month') => void
   setSlotData: (dk: string, data: SlotData) => void
   mergeSlotData: (allData: Record<string, SlotData>) => void
 
@@ -32,6 +32,8 @@ interface CalendarState {
 
   pushUndo: (entry: UndoEntry) => void
   undo: () => UndoEntry | null
+
+  replaceCategoryInSlots: (sourceCatId: string, targetCatId: string) => void
 
   setFocusedSlot: (slot: { dateKey: string; slotKey: string } | null) => void
   clearFocusedSlot: () => void
@@ -108,6 +110,24 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
     }))
     return entry
   },
+
+  replaceCategoryInSlots: (sourceCatId, targetCatId) =>
+    set((state) => {
+      const newSlotData = { ...state.slotData }
+      for (const dk of Object.keys(newSlotData)) {
+        const daySlots = newSlotData[dk]
+        let changed = false
+        const newDay = { ...daySlots }
+        for (const [key, entry] of Object.entries(newDay)) {
+          if (entry.categoryId === sourceCatId) {
+            newDay[key] = { ...entry, categoryId: targetCatId }
+            changed = true
+          }
+        }
+        if (changed) newSlotData[dk] = newDay
+      }
+      return { slotData: newSlotData }
+    }),
 
   setFocusedSlot: (slot) => set({ focusedSlot: slot }),
   clearFocusedSlot: () => set({ focusedSlot: null }),

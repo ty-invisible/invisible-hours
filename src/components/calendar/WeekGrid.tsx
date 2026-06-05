@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
-import { SLOTS, dateKey, getWeekDates } from '../../lib/slots'
+import { dateKey, getWeekDates, getDisplaySlots, getDisplaySegments, type SlotGranularity } from '../../lib/slots'
 import { useCalendarStore } from '../../store/calendarStore'
 import { useUIStore } from '../../store/uiStore'
 import { useGoogleCalendarStore } from '../../store/googleCalendarStore'
@@ -11,9 +11,14 @@ import { useDragPaint } from '../../hooks/useDragPaint'
 import type { SlotEntry } from '../../store/calendarStore'
 import { computeSlotGroupPositions } from '../../lib/slotGroups'
 
-const WEEK_SLOT_HEIGHT = 44
-const SCROLL_TO_INDEX = 16 // 08:00
+const WEEK_SLOT_HEIGHTS: Record<SlotGranularity, number> = { 15: 24, 30: 44, 60: 72 }
 const DAY_ABBREVS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+function scrollIndexForGranularity(granularity: SlotGranularity): number {
+  const minuteTarget = 8 * 60
+  const slotsPerHour = 60 / granularity
+  return Math.floor((minuteTarget / 60) * slotsPerHour)
+}
 
 function formatHourLabel(slotKey: string): string {
   const hour = parseInt(slotKey.split(':')[0], 10)
@@ -35,6 +40,10 @@ export function WeekGrid({ onStrokeComplete, onSaveNote }: WeekGridProps) {
   const setFocusedSlot = useCalendarStore((s) => s.setFocusedSlot)
 
   const showWeekends = useUIStore((s) => s.showWeekends)
+  const granularity = useUIStore((s) => s.slotGranularity)
+
+  const displaySlots = useMemo(() => getDisplaySlots(granularity), [granularity])
+  const slotHeight = WEEK_SLOT_HEIGHTS[granularity]
 
   const allWeekDates = getWeekDates(currentDate)
   const visibleDays = useMemo(() => {
@@ -61,8 +70,9 @@ export function WeekGrid({ onStrokeComplete, onSaveNote }: WeekGridProps) {
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
+    const scrollIdx = scrollIndexForGranularity(granularity)
     requestAnimationFrame(() => {
-      el.scrollTop = SCROLL_TO_INDEX * WEEK_SLOT_HEIGHT
+      el.scrollTop = scrollIdx * slotHeight
     })
   }, [])
 
@@ -88,9 +98,11 @@ export function WeekGrid({ onStrokeComplete, onSaveNote }: WeekGridProps) {
     setNotePopup({ dk, slotKey, position: { x: e.clientX, y: e.clientY } })
   }, [])
 
+  const totalHeight = displaySlots.length * slotHeight
+
   return (
     <div className="h-full flex flex-col">
-      {/* Day headers — offset left to account for hour label gutter */}
+      {/* Day headers */}
       <div className="flex border-b border-border flex-shrink-0">
         <div className="w-12 flex-shrink-0" />
         {visibleDays.map(({ date, abbrev }, i) => {
@@ -120,16 +132,16 @@ export function WeekGrid({ onStrokeComplete, onSaveNote }: WeekGridProps) {
       >
         <div className="flex pt-3 pb-3 pr-2">
           {/* Hour labels gutter */}
-          <div className="w-12 flex-shrink-0 relative" style={{ height: SLOTS.length * WEEK_SLOT_HEIGHT }}>
-            {SLOTS.map((slot) => {
-              if (!slot.key.endsWith(':00')) return null
+          <div className="w-12 flex-shrink-0 relative" style={{ height: totalHeight }}>
+            {displaySlots.map((ds) => {
+              if (!ds.key.endsWith(':00')) return null
               return (
                 <div
-                  key={slot.key}
+                  key={ds.key}
                   className="absolute right-1.5 text-[10px] text-muted select-none leading-none"
-                  style={{ top: Math.max(0, slot.index * WEEK_SLOT_HEIGHT - 5) }}
+                  style={{ top: Math.max(0, ds.displayIndex * slotHeight - 5) }}
                 >
-                  {formatHourLabel(slot.key)}
+                  {formatHourLabel(ds.key)}
                 </div>
               )
             })}
@@ -146,6 +158,9 @@ export function WeekGrid({ onStrokeComplete, onSaveNote }: WeekGridProps) {
                   isToday={dk === todayDk}
                   slotData={slotData}
                   isDragging={isDragging}
+                  displaySlots={displaySlots}
+                  slotHeight={slotHeight}
+                  granularity={granularity}
                   onSlotMouseDown={onSlotMouseDown}
                   onSlotMouseEnter={onSlotMouseEnter}
                   onSlotTouchStart={onSlotTouchStart}
@@ -181,6 +196,9 @@ interface WeekDayColumnProps {
   isToday: boolean
   slotData: Record<string, Record<string, import('../../store/calendarStore').SlotEntry>>
   isDragging: boolean
+  displaySlots: import('../../lib/slots').DisplaySlot[]
+  slotHeight: number
+  granularity: SlotGranularity
   onSlotMouseDown: (dk: string, slotKey: string, e: React.MouseEvent) => void
   onSlotMouseEnter: (dk: string, slotKey: string) => void
   onSlotTouchStart: (dk: string, slotKey: string, x: number, y: number, touchId: number) => void
@@ -191,12 +209,15 @@ interface WeekDayColumnProps {
 }
 
 function WeekDayColumn({
-  dk, isToday, slotData, isDragging,
+  dk, isToday, slotData, isDragging, displaySlots, slotHeight, granularity,
   onSlotMouseDown, onSlotMouseEnter, onSlotTouchStart, onSlotTouchEnd, onSlotTouchCancel,
   onContextMenu, onNoteClick,
 }: WeekDayColumnProps) {
   const daySlots = slotData[dk] || {}
-  const groupPositions = useMemo(() => computeSlotGroupPositions(daySlots), [daySlots])
+  const groupPositions = useMemo(
+    () => computeSlotGroupPositions(daySlots, granularity),
+    [daySlots, granularity],
+  )
   const gcalVisible = useGoogleCalendarStore((s) => s.visible)
   const gcalEvents = useGoogleCalendarStore((s) => s.eventsByDate[dk])
   const gcalSlots = useMemo(
@@ -206,26 +227,31 @@ function WeekDayColumn({
 
   return (
     <div className={`flex-1 ${isToday ? 'bg-accent/[0.03]' : ''}`}>
-      {SLOTS.map((slot) => (
-        <SlotCell
-          key={slot.key}
-          dk={dk}
-          slotKey={slot.key}
-          slotLabel={slot.label}
-          entry={daySlots[slot.key]}
-          googleEvent={gcalSlots[slot.key] ?? null}
-          isWeekView
-          isDragging={isDragging}
-          groupPosition={groupPositions[slot.key]}
-          onMouseDown={onSlotMouseDown}
-          onMouseEnter={onSlotMouseEnter}
-          onTouchStart={onSlotTouchStart}
-          onTouchEnd={onSlotTouchEnd}
-          onTouchCancel={onSlotTouchCancel}
-          onContextMenu={onContextMenu}
-          onNoteClick={onNoteClick}
-        />
-      ))}
+      {displaySlots.map((ds) => {
+        const segments = getDisplaySegments(daySlots, ds.baseKeys)
+        const gcalEvent = gcalSlots[ds.baseKeys[0]] ?? null
+        return (
+          <SlotCell
+            key={ds.key}
+            dk={dk}
+            slotKey={ds.key}
+            slotLabel={ds.label}
+            segments={segments}
+            googleEvent={gcalEvent}
+            isWeekView
+            isDragging={isDragging}
+            groupPosition={groupPositions[ds.key]}
+            slotHeight={slotHeight}
+            onMouseDown={onSlotMouseDown}
+            onMouseEnter={onSlotMouseEnter}
+            onTouchStart={onSlotTouchStart}
+            onTouchEnd={onSlotTouchEnd}
+            onTouchCancel={onSlotTouchCancel}
+            onContextMenu={onContextMenu}
+            onNoteClick={onNoteClick}
+          />
+        )
+      })}
     </div>
   )
 }

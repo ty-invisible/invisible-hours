@@ -1,9 +1,9 @@
-import { SLOTS } from './slots'
+import { SLOTS, SLOT_MINUTES } from './slots'
 import type { GoogleCalendarEvent, GoogleCalendarSlotInfo } from '../store/googleCalendarStore'
 
 /**
  * Maps a list of Google Calendar events for a single day into a
- * Record<slotKey, GoogleCalendarSlotInfo> so each half-hour slot knows
+ * Record<slotKey, GoogleCalendarSlotInfo> so each 15-min base slot knows
  * which event (if any) occupies it.
  *
  * - allDay events are skipped (they don't map to specific time slots).
@@ -33,12 +33,12 @@ export function mapEventsToSlots(
     const startMinutes = effectiveStart.getHours() * 60 + effectiveStart.getMinutes()
     const endMinutes = effectiveEnd.getHours() * 60 + effectiveEnd.getMinutes()
 
-    const startSlotIndex = Math.floor(startMinutes / 30)
-    const endSlotIndex = endMinutes % 30 === 0
-      ? Math.max(startSlotIndex, (endMinutes / 30) - 1)
-      : Math.floor(endMinutes / 30)
+    const startSlotIndex = Math.floor(startMinutes / SLOT_MINUTES)
+    const endSlotIndex = endMinutes % SLOT_MINUTES === 0
+      ? Math.max(startSlotIndex, (endMinutes / SLOT_MINUTES) - 1)
+      : Math.floor(endMinutes / SLOT_MINUTES)
 
-    const lastIndex = Math.min(endSlotIndex, 47)
+    const lastIndex = Math.min(endSlotIndex, SLOTS.length - 1)
     let isFirst = true
     for (let i = startSlotIndex; i <= lastIndex; i++) {
       const slotKey = SLOTS[i].key

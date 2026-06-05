@@ -1,8 +1,9 @@
 import { memo, useRef, useCallback, useMemo } from 'react'
 import { contrastColor, lighten } from '../../lib/categories'
 import { useCategoryStore } from '../../store/categoryStore'
-import { useCalendarStore, type SlotEntry } from '../../store/calendarStore'
+import { useCalendarStore } from '../../store/calendarStore'
 import type { GoogleCalendarSlotInfo } from '../../store/googleCalendarStore'
+import type { DisplaySegment } from '../../lib/slots'
 
 const CROSS_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Cline x1='4' y1='4' x2='16' y2='16' stroke='white' stroke-width='4' stroke-linecap='round'/%3E%3Cline x1='16' y1='4' x2='4' y2='16' stroke='white' stroke-width='4' stroke-linecap='round'/%3E%3Cline x1='4' y1='4' x2='16' y2='16' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3Cline x1='16' y1='4' x2='4' y2='16' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 10 10, crosshair`
 
@@ -16,11 +17,12 @@ interface SlotCellProps {
   dk: string
   slotKey: string
   slotLabel: string
-  entry: SlotEntry | undefined
+  segments: DisplaySegment[]
   googleEvent?: GoogleCalendarSlotInfo | null
   isWeekView?: boolean
   isDragging?: boolean
   groupPosition?: SlotGroupPosition
+  slotHeight?: number
   onMouseDown: (dk: string, slotKey: string, e: React.MouseEvent) => void
   onMouseEnter: (dk: string, slotKey: string) => void
   onTouchStart?: (dk: string, slotKey: string, x: number, y: number, touchId: number) => void
@@ -37,28 +39,93 @@ const GROUP_RADIUS: Record<SlotGroupPosition, string> = {
   last: 'rounded-b-lg',
 }
 
+function buildSegmentGradient(
+  segments: DisplaySegment[],
+  getCategoryColor: (catId: string) => string,
+): string | undefined {
+  const n = segments.length
+  if (n <= 1) return undefined
+
+  const colors = segments.map((s) =>
+    s.categoryId ? getCategoryColor(s.categoryId) : 'var(--color-surface)'
+  )
+
+  const bands: { color: string; start: number; end: number }[] = []
+  let i = 0
+  while (i < n) {
+    let j = i + 1
+    while (j < n && colors[j] === colors[i]) j++
+    bands.push({
+      color: colors[i],
+      start: (i / n) * 100,
+      end: (j / n) * 100,
+    })
+    i = j
+  }
+
+  if (bands.length === 1) return undefined
+
+  const stops = bands.map((band, bi) => {
+    const pos = bi === 0 ? 0 : bi === bands.length - 1 ? 100 : ((band.start + band.end) / 2)
+    return `${band.color} ${pos}%`
+  })
+
+  return `linear-gradient(to bottom, ${stops.join(', ')})`
+}
+
 export const SlotCell = memo(function SlotCell({
-  dk, slotKey, entry, googleEvent, isWeekView, isDragging, groupPosition,
+  dk, slotKey, segments, googleEvent, isWeekView, isDragging, groupPosition, slotHeight,
   onMouseDown, onMouseEnter, onTouchStart, onTouchEnd, onTouchCancel, onContextMenu, onNoteClick,
 }: SlotCellProps) {
   const activeCategoryId = useCategoryStore((s) => s.activeCategoryId)
   const eraserOn = useCategoryStore((s) => s.eraserOn)
   const getCategoryColor = useCategoryStore((s) => s.getCategoryColor)
   const getCategoryLabel = useCategoryStore((s) => s.getCategoryLabel)
-  const isFilled = !!entry
-  const hasNote = isFilled && !!entry.note
 
-  const color = isFilled ? getCategoryColor(entry.categoryId) : undefined
+  const firstFilled = segments.find((s) => s.categoryId !== null)
+  const isFilled = !!firstFilled
+  const primaryCatId = firstFilled?.categoryId ?? null
+
+  const slotData = useCalendarStore((s) => s.slotData)
+  const hasNote = isFilled && !!slotData[dk]?.[firstFilled.baseKey]?.note
+
+  const isMultiSegment = segments.length > 1
+  const filledCount = segments.filter((s) => s.categoryId !== null).length
+  const isPartialFill = isMultiSegment && filledCount > 0 && filledCount < segments.length
+  const hasMultipleCategories = useMemo(() => {
+    const cats = new Set(segments.filter((s) => s.categoryId).map((s) => s.categoryId))
+    return cats.size > 1
+  }, [segments])
+  const needsGradient = isMultiSegment && isFilled && (hasMultipleCategories || isPartialFill)
+
+  const color = primaryCatId ? getCategoryColor(primaryCatId) : undefined
   const textColor = color ? contrastColor(color) : undefined
-  const label = isFilled ? getCategoryLabel(entry.categoryId) : undefined
+
+  const combinedLabel = useMemo(() => {
+    if (!isFilled) return undefined
+    const seen = new Set<string>()
+    const labels: string[] = []
+    for (const seg of segments) {
+      if (seg.categoryId && !seen.has(seg.categoryId)) {
+        seen.add(seg.categoryId)
+        labels.push(getCategoryLabel(seg.categoryId))
+      }
+    }
+    return labels.join(' & ')
+  }, [segments, isFilled, getCategoryLabel])
+
+  const gradientBg = useMemo(
+    () => needsGradient ? buildSegmentGradient(segments, getCategoryColor) : undefined,
+    [needsGradient, segments, getCategoryColor],
+  )
 
   const showPreview = !isFilled && activeCategoryId && !eraserOn
   const previewColor = showPreview ? getCategoryColor(activeCategoryId) : undefined
 
   const isHourStart = slotKey.endsWith(':00')
 
-  const showCross = !isDragging && (eraserOn || (isFilled && activeCategoryId === entry.categoryId))
-  const showSwap = !isDragging && isFilled && !eraserOn && !!activeCategoryId && activeCategoryId !== entry.categoryId
+  const showCross = !isDragging && (eraserOn || (isFilled && activeCategoryId === primaryCatId))
+  const showSwap = !isDragging && isFilled && !eraserOn && !!activeCategoryId && activeCategoryId !== primaryCatId
   const showPlus = !isDragging && !isFilled && !!activeCategoryId && !eraserOn
 
   const showIdleHover = !isDragging && isFilled && !activeCategoryId && !eraserOn
@@ -71,7 +138,7 @@ export const SlotCell = memo(function SlotCell({
     return `linear-gradient(-45deg, ${color}, ${l1}, ${l2}, ${l1}, ${color})`
   }, [showIdleHover, color])
 
-  const swapColor = showSwap ? getCategoryColor(activeCategoryId) : undefined
+  const swapColor = showSwap && activeCategoryId ? getCategoryColor(activeCategoryId) : undefined
   const swapOverlayRef = useRef<HTMLDivElement>(null)
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
@@ -81,19 +148,25 @@ export const SlotCell = memo(function SlotCell({
     const y = e.clientY - rect.top
     swapOverlayRef.current.style.background =
       `radial-gradient(circle at ${x}px ${y}px, ${swapColor}90 0%, transparent 50%)`
-  }, [showSwap, swapColor, color])
+  }, [showSwap, swapColor])
 
   const cursor = showCross ? CROSS_CURSOR : showSwap ? SWAP_CURSOR : showPlus ? PLUS_CURSOR : undefined
+
+  const fillStyle = useMemo(() => {
+    if (!isFilled) return undefined
+    if (gradientBg) {
+      return { background: gradientBg, color: textColor }
+    }
+    return { backgroundColor: color, color: textColor }
+  }, [isFilled, gradientBg, color, textColor])
 
   return (
     <div
       data-dk={dk}
       data-slot-key={slotKey}
-      className={`group relative flex items-center select-none ${
-        isWeekView ? 'h-[44px]' : 'h-[48px]'
-      } ${isHourStart ? 'border-t border-border/40' : 'border-t border-border/15'}
+      className={`group relative flex items-center select-none ${isHourStart ? 'border-t border-border/40' : 'border-t border-border/15'}
       `}
-      style={cursor ? { cursor } : undefined}
+      style={{ height: slotHeight ?? (isWeekView ? 44 : 48), ...(cursor ? { cursor } : {}) }}
       onMouseDown={(e) => {
         if (e.button === 2) return
         if (!activeCategoryId && !eraserOn) {
@@ -132,11 +205,11 @@ export const SlotCell = memo(function SlotCell({
             className={`absolute inset-0 flex items-center px-2 transition-[filter,opacity] duration-150 ${roundedClass} ${
               showCross ? 'group-hover:opacity-60 group-hover:saturate-50' : ''
             }`}
-            style={{ backgroundColor: color, color: textColor }}
+            style={fillStyle}
           >
             {(!groupPosition || groupPosition === 'solo' || groupPosition === 'first') && (
               <span className={`${isWeekView ? 'text-[10px]' : 'text-xs'} font-medium truncate relative z-10`}>
-                {label}
+                {combinedLabel}
               </span>
             )}
             {hasNote && (
@@ -152,7 +225,7 @@ export const SlotCell = memo(function SlotCell({
                 className="absolute inset-0 rounded-[inherit] opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none"
               />
             )}
-            {showIdleHover && idleGradient && (
+            {showIdleHover && idleGradient && !gradientBg && (
               <div
                 className="absolute inset-0 rounded-[inherit] opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
                 style={{

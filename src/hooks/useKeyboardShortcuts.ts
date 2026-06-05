@@ -55,13 +55,17 @@ export function useKeyboardShortcuts() {
         return
       }
 
-      // W => week view, D => day view
+      // W => week view, D => day view, M => month view
       if (e.key === 'w' || e.key === 'W') {
         useCalendarStore.getState().setViewMode('week')
         return
       }
       if (e.key === 'd' || e.key === 'D') {
         useCalendarStore.getState().setViewMode('day')
+        return
+      }
+      if (e.key === 'm' || e.key === 'M') {
+        useCalendarStore.getState().setViewMode('month')
         return
       }
 
@@ -71,7 +75,9 @@ export function useKeyboardShortcuts() {
         const { currentDate, viewMode, setCurrentDate } = useCalendarStore.getState()
         const next = new Date(currentDate)
         const dir: -1 | 1 = e.key === 'ArrowLeft' ? -1 : 1
-        if (viewMode === 'week') {
+        if (viewMode === 'month') {
+          next.setMonth(next.getMonth() + dir)
+        } else if (viewMode === 'week') {
           next.setDate(next.getDate() + dir * 7)
         } else {
           next.setDate(next.getDate() + dir)

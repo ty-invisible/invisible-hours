@@ -3,13 +3,29 @@ import { supabase } from '../lib/supabase'
 import { useCalendarStore, type SlotEntry } from '../store/calendarStore'
 import { useCategoryStore } from '../store/categoryStore'
 import { useUIStore } from '../store/uiStore'
-import { dateKey, getWeekDates } from '../lib/slots'
+import { dateKey, getWeekDates, getMonthDates } from '../lib/slots'
 import type { Category } from '../lib/categories'
 import type { User } from '@supabase/supabase-js'
+
+const MIGRATION_LS_KEY = 'idt-migrated-15min'
+
+/**
+ * Expand a 30-min slot key to its companion 15-min key:
+ *   "09:00" -> "09:15"
+ *   "09:30" -> "09:45"
+ * Returns null for keys that are already 15-min subdivisions.
+ */
+function companion15Key(slotKey: string): string | null {
+  const [hh, mm] = slotKey.split(':')
+  if (mm === '00') return `${hh}:15`
+  if (mm === '30') return `${hh}:45`
+  return null
+}
 
 export function useSupabaseSync(user: User | null) {
   const loadedDates = useRef<Set<string>>(new Set())
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const migrationRan = useRef(false)
 
   const loadCategories = useCallback(async () => {
     if (!user) return
@@ -64,28 +80,104 @@ export function useSupabaseSync(user: User | null) {
     const { currentDate, viewMode } = useCalendarStore.getState()
     if (viewMode === 'day') {
       await loadEntriesForDates([dateKey(currentDate)])
-    } else {
+    } else if (viewMode === 'week') {
       const weekDates = getWeekDates(currentDate)
       await loadEntriesForDates(weekDates.map(dateKey))
+    } else {
+      const monthDates = getMonthDates(currentDate)
+      await loadEntriesForDates(monthDates.map(dateKey))
     }
   }, [loadEntriesForDates])
 
-  // Optional Supabase table for cross-device sync: create table user_settings (user_id uuid primary key, work_day_start smallint default 18, work_day_end smallint default 35);
   const loadUserSettings = useCallback(async () => {
     if (!user) return
     try {
       const { data } = await supabase
         .from('user_settings')
-        .select('work_day_start, work_day_end')
+        .select('*')
         .eq('user_id', user.id)
         .maybeSingle()
       if (data?.work_day_start != null && data?.work_day_end != null) {
-        const s = Math.max(0, Math.min(47, Number(data.work_day_start)))
-        const e = Math.max(0, Math.min(47, Number(data.work_day_end)))
+        const s = Math.max(0, Math.min(95, Number(data.work_day_start)))
+        const e = Math.max(0, Math.min(95, Number(data.work_day_end)))
         useUIStore.getState().setWorkDayRange(s, e)
+      }
+      if (data?.slot_granularity != null) {
+        const g = Number(data.slot_granularity)
+        if (g === 15 || g === 30 || g === 60) {
+          useUIStore.getState().setSlotGranularity(g)
+        }
+      }
+      if (data?.data_migrated_15min) {
+        migrationRan.current = true
       }
     } catch {
       // user_settings table may not exist; keep localStorage defaults
+    }
+  }, [user])
+
+  const migrateDataTo15Min = useCallback(async () => {
+    if (!user) return
+    if (migrationRan.current) return
+    if (localStorage.getItem(MIGRATION_LS_KEY) === '1') {
+      migrationRan.current = true
+      return
+    }
+
+    try {
+      const { data: entries } = await supabase
+        .from('time_entries')
+        .select('date, slot_key, category_id, note')
+        .eq('user_id', user.id)
+
+      if (!entries || entries.length === 0) {
+        localStorage.setItem(MIGRATION_LS_KEY, '1')
+        migrationRan.current = true
+        return
+      }
+
+      const existingKeys = new Set(entries.map((e) => `${e.date}|${e.slot_key}`))
+      const newRows: Array<{
+        user_id: string; date: string; slot_key: string; category_id: string; note: string
+      }> = []
+
+      for (const entry of entries) {
+        const comp = companion15Key(entry.slot_key)
+        if (!comp) continue
+        const compositeKey = `${entry.date}|${comp}`
+        if (existingKeys.has(compositeKey)) continue
+        newRows.push({
+          user_id: user.id,
+          date: entry.date,
+          slot_key: comp,
+          category_id: entry.category_id,
+          note: entry.note || '',
+        })
+        existingKeys.add(compositeKey)
+      }
+
+      if (newRows.length > 0) {
+        const batchSize = 500
+        for (let i = 0; i < newRows.length; i += batchSize) {
+          await supabase
+            .from('time_entries')
+            .upsert(newRows.slice(i, i + batchSize), { onConflict: 'user_id,date,slot_key' })
+        }
+      }
+
+      localStorage.setItem(MIGRATION_LS_KEY, '1')
+      migrationRan.current = true
+
+      try {
+        await supabase.from('user_settings').upsert(
+          { user_id: user.id, data_migrated_15min: true },
+          { onConflict: 'user_id' }
+        )
+      } catch { /* optional column may not exist */ }
+
+      loadedDates.current.clear()
+    } catch {
+      // Migration failed; will retry next load
     }
   }, [user])
 
@@ -108,11 +200,15 @@ export function useSupabaseSync(user: User | null) {
   // Initial load
   useEffect(() => {
     if (!user) return
-    loadCategories()
-    loadCurrentView()
-    loadUserSettings()
-    loadAllTimeTotals()
-  }, [user, loadCategories, loadCurrentView, loadUserSettings, loadAllTimeTotals])
+    const init = async () => {
+      await loadUserSettings()
+      await migrateDataTo15Min()
+      loadCategories()
+      loadCurrentView()
+      loadAllTimeTotals()
+    }
+    init()
+  }, [user, loadCategories, loadCurrentView, loadUserSettings, loadAllTimeTotals, migrateDataTo15Min])
 
   // Reload when date/view changes
   useEffect(() => {
@@ -213,6 +309,42 @@ export function useSupabaseSync(user: User | null) {
     saveTimer.current = setTimeout(() => setSaveStatus('idle'), 2000)
   }, [user, setSaveStatus])
 
+  const mergeCategories = useCallback(async (sourceCatId: string, targetCatId: string) => {
+    if (!user) return
+    setSaveStatus('saving')
+
+    await supabase
+      .from('time_entries')
+      .update({ category_id: targetCatId })
+      .eq('user_id', user.id)
+      .eq('category_id', sourceCatId)
+
+    useCalendarStore.getState().replaceCategoryInSlots(sourceCatId, targetCatId)
+    useCategoryStore.getState().deleteCategory(sourceCatId)
+
+    const { userCategories } = useCategoryStore.getState()
+    const upserts = userCategories.map((c) => ({
+      user_id: user.id,
+      cat_id: c.catId,
+      label: c.label,
+      color: c.color,
+      is_default: c.isDefault,
+      is_deleted: c.isDeleted,
+      sort_order: c.sortOrder,
+    }))
+    if (upserts.length > 0) {
+      await supabase.from('user_categories').upsert(upserts, { onConflict: 'user_id,cat_id' })
+    }
+
+    loadedDates.current.clear()
+    await loadCurrentView()
+    loadAllTimeTotals()
+
+    setSaveStatus('saved')
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => setSaveStatus('idle'), 2000)
+  }, [user, setSaveStatus, loadCurrentView, loadAllTimeTotals])
+
   const deleteAllEntriesForCategory = useCallback(async (catId: string) => {
     if (!user) return
     await supabase.from('time_entries').delete().eq('user_id', user.id).eq('category_id', catId)
@@ -251,13 +383,28 @@ export function useSupabaseSync(user: User | null) {
     }
   }, [user])
 
+  const saveSlotGranularity = useCallback(async () => {
+    if (!user) return
+    try {
+      const { slotGranularity } = useUIStore.getState()
+      await supabase.from('user_settings').upsert(
+        { user_id: user.id, slot_granularity: slotGranularity },
+        { onConflict: 'user_id' }
+      )
+    } catch {
+      // user_settings table may not exist
+    }
+  }, [user])
+
   return {
     saveEntries,
     saveNote,
     saveCategories,
+    mergeCategories,
     deleteAllEntriesForCategory,
     bulkImportEntries,
     loadCurrentView,
     saveWorkDayRange,
+    saveSlotGranularity,
   }
 }
